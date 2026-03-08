@@ -1,31 +1,24 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('CarruselImagen', {
-    CodigoCarruselImagen: {
+  return sequelize.define('Tela', {
+    CodigoTela: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true
     },
-    CodigoCarrusel: {
+    CodigoTipoTela: {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'Carrusel',
-        key: 'CodigoCarrusel'
+        model: 'TipoTela',
+        key: 'CodigoTipoTela'
       }
     },
-    NombreCarruselImagen: {
+    NombreTela: {
       type: DataTypes.STRING(64),
-      allowNull: true
-    },
-    UrlImagen: {
-      type: DataTypes.STRING(256),
-      allowNull: false
-    },
-    Orden: {
-      type: DataTypes.STRING(16),
-      allowNull: true
+      allowNull: true,
+      unique: "Uq_CaTela_NombreTela"
     },
     Estatus: {
       type: DataTypes.TINYINT,
@@ -34,15 +27,22 @@ module.exports = function(sequelize, DataTypes) {
     }
   }, {
     sequelize,
-    tableName: 'CarruselImagen',
-    schema: 'Ui',
+    tableName: 'Tela',
+    schema: 'Ca',
     timestamps: false,
     indexes: [
       {
-        name: "Pk_UiCarruselImagen_CodigoCarruselImagen",
+        name: "Pk_CaTela_CodigoTela",
         unique: true,
         fields: [
-          { name: "CodigoCarruselImagen" },
+          { name: "CodigoTela" },
+        ]
+      },
+      {
+        name: "Uq_CaTela_NombreTela",
+        unique: true,
+        fields: [
+          { name: "NombreTela" },
         ]
       },
     ]

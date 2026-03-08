@@ -1,117 +1,87 @@
 var DataTypes = require("sequelize").DataTypes;
-var _AlertaEstilo = require("./AlertaEstilo");
-var _AlertaEstiloBoton = require("./AlertaEstiloBoton");
-var _CarritoPortada = require("./CarritoPortada");
-var _Carrusel = require("./Carrusel");
-var _CarruselImagen = require("./CarruselImagen");
-var _ClasificacionProducto = require("./ClasificacionProducto");
-var _ContactanosPortada = require("./ContactanosPortada");
+var _Abertura = require("./Abertura");
+var _Boton = require("./Boton");
+var _Categoria = require("./Categoria");
+var _Cliente = require("./Cliente");
+var _Color = require("./Color");
 var _Empresa = require("./Empresa");
-var _EmpresaPortada = require("./EmpresaPortada");
-var _Footer = require("./Footer");
-var _Icono = require("./Icono");
-var _LoginPortada = require("./LoginPortada");
-var _Logo = require("./Logo");
-var _LogoImagen = require("./LogoImagen");
-var _MenuPortada = require("./MenuPortada");
-var _Navbar = require("./Navbar");
-var _Otro = require("./Otro");
+var _EstadoPedido = require("./EstadoPedido");
+var _Estilo = require("./Estilo");
+var _FormaPago = require("./FormaPago");
+var _Inventario = require("./Inventario");
+var _Marca = require("./Marca");
+var _MovimientoInventario = require("./MovimientoInventario");
 var _Pago = require("./Pago");
+var _PagoAplicacion = require("./PagoAplicacion");
+var _Pedido = require("./Pedido");
+var _PedidoDetalle = require("./PedidoDetalle");
+var _PedidoDetalleMedida = require("./PedidoDetalleMedida");
 var _Permiso = require("./Permiso");
 var _PermisoRolRecurso = require("./PermisoRolRecurso");
-var _PortadaOtro = require("./PortadaOtro");
 var _Producto = require("./Producto");
-var _ProductoPortada = require("./ProductoPortada");
 var _Recurso = require("./Recurso");
-var _RedSocial = require("./RedSocial");
-var _RedSocialImagen = require("./RedSocialImagen");
-var _ReporteProducto = require("./ReporteProducto");
-var _ReporteRedSocial = require("./ReporteRedSocial");
-var _ReporteRedSocialPortada = require("./ReporteRedSocialPortada");
-var _ReporteTiempoPagina = require("./ReporteTiempoPagina");
-var _ReporteTiempoPaginaPortada = require("./ReporteTiempoPaginaPortada");
-var _ReporteVista = require("./ReporteVista");
-var _ReporteVistaPortada = require("./ReporteVistaPortada");
 var _Rol = require("./Rol");
+var _Talla = require("./Talla");
+var _Tamano = require("./Tamano");
+var _Tela = require("./Tela");
+var _TipoCorte = require("./TipoCorte");
+var _TipoCuello = require("./TipoCuello");
+var _TipoEmpresa = require("./TipoEmpresa");
+var _TipoMedida = require("./TipoMedida");
+var _TipoProducto = require("./TipoProducto");
+var _TipoSolapa = require("./TipoSolapa");
+var _TipoTela = require("./TipoTela");
 var _Usuario = require("./Usuario");
 
 function initModels(sequelize) {
-  var AlertaEstilo = _AlertaEstilo(sequelize, DataTypes);
-  var AlertaEstiloBoton = _AlertaEstiloBoton(sequelize, DataTypes);
-  var CarritoPortada = _CarritoPortada(sequelize, DataTypes);
-  var Carrusel = _Carrusel(sequelize, DataTypes);
-  var CarruselImagen = _CarruselImagen(sequelize, DataTypes);
-  var ClasificacionProducto = _ClasificacionProducto(sequelize, DataTypes);
-  var ContactanosPortada = _ContactanosPortada(sequelize, DataTypes);
+  var Abertura = _Abertura(sequelize, DataTypes);
+  var Boton = _Boton(sequelize, DataTypes);
+  var Categoria = _Categoria(sequelize, DataTypes);
+  var Cliente = _Cliente(sequelize, DataTypes);
+  var Color = _Color(sequelize, DataTypes);
   var Empresa = _Empresa(sequelize, DataTypes);
-  var EmpresaPortada = _EmpresaPortada(sequelize, DataTypes);
-  var Footer = _Footer(sequelize, DataTypes);
-  var Icono = _Icono(sequelize, DataTypes);
-  var LoginPortada = _LoginPortada(sequelize, DataTypes);
-  var Logo = _Logo(sequelize, DataTypes);
-  var LogoImagen = _LogoImagen(sequelize, DataTypes);
-  var MenuPortada = _MenuPortada(sequelize, DataTypes);
-  var Navbar = _Navbar(sequelize, DataTypes);
-  var Otro = _Otro(sequelize, DataTypes);
+  var EstadoPedido = _EstadoPedido(sequelize, DataTypes);
+  var Estilo = _Estilo(sequelize, DataTypes);
+  var FormaPago = _FormaPago(sequelize, DataTypes);
+  var Inventario = _Inventario(sequelize, DataTypes);
+  var Marca = _Marca(sequelize, DataTypes);
+  var MovimientoInventario = _MovimientoInventario(sequelize, DataTypes);
   var Pago = _Pago(sequelize, DataTypes);
+  var PagoAplicacion = _PagoAplicacion(sequelize, DataTypes);
+  var Pedido = _Pedido(sequelize, DataTypes);
+  var PedidoDetalle = _PedidoDetalle(sequelize, DataTypes);
+  var PedidoDetalleMedida = _PedidoDetalleMedida(sequelize, DataTypes);
   var Permiso = _Permiso(sequelize, DataTypes);
   var PermisoRolRecurso = _PermisoRolRecurso(sequelize, DataTypes);
-  var PortadaOtro = _PortadaOtro(sequelize, DataTypes);
   var Producto = _Producto(sequelize, DataTypes);
-  var ProductoPortada = _ProductoPortada(sequelize, DataTypes);
   var Recurso = _Recurso(sequelize, DataTypes);
-  var RedSocial = _RedSocial(sequelize, DataTypes);
-  var RedSocialImagen = _RedSocialImagen(sequelize, DataTypes);
-  var ReporteProducto = _ReporteProducto(sequelize, DataTypes);
-  var ReporteRedSocial = _ReporteRedSocial(sequelize, DataTypes);
-  var ReporteRedSocialPortada = _ReporteRedSocialPortada(sequelize, DataTypes);
-  var ReporteTiempoPagina = _ReporteTiempoPagina(sequelize, DataTypes);
-  var ReporteTiempoPaginaPortada = _ReporteTiempoPaginaPortada(sequelize, DataTypes);
-  var ReporteVista = _ReporteVista(sequelize, DataTypes);
-  var ReporteVistaPortada = _ReporteVistaPortada(sequelize, DataTypes);
   var Rol = _Rol(sequelize, DataTypes);
+  var Talla = _Talla(sequelize, DataTypes);
+  var Tamano = _Tamano(sequelize, DataTypes);
+  var Tela = _Tela(sequelize, DataTypes);
+  var TipoCorte = _TipoCorte(sequelize, DataTypes);
+  var TipoCuello = _TipoCuello(sequelize, DataTypes);
+  var TipoEmpresa = _TipoEmpresa(sequelize, DataTypes);
+  var TipoMedida = _TipoMedida(sequelize, DataTypes);
+  var TipoProducto = _TipoProducto(sequelize, DataTypes);
+  var TipoSolapa = _TipoSolapa(sequelize, DataTypes);
+  var TipoTela = _TipoTela(sequelize, DataTypes);
   var Usuario = _Usuario(sequelize, DataTypes);
 
-  Pago.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(Pago, { as: "Pagos", foreignKey: "CodigoEmpresa"});
   Usuario.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
   Empresa.hasMany(Usuario, { as: "Usuarios", foreignKey: "CodigoEmpresa"});
-  Carrusel.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(Carrusel, { as: "Carrusels", foreignKey: "CodigoEmpresa"});
-  ClasificacionProducto.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(ClasificacionProducto, { as: "ClasificacionProductos", foreignKey: "CodigoEmpresa"});
-  Icono.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(Icono, { as: "Iconos", foreignKey: "CodigoEmpresa"});
-  Logo.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(Logo, { as: "Logos", foreignKey: "CodigoEmpresa"});
-  Otro.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(Otro, { as: "Otros", foreignKey: "CodigoEmpresa"});
-  RedSocial.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(RedSocial, { as: "RedSocials", foreignKey: "CodigoEmpresa"});
-  CarritoPortada.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(CarritoPortada, { as: "CarritoPortadas", foreignKey: "CodigoEmpresa"});
-  AlertaEstilo.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(AlertaEstilo, { as: "AlertaEstilos", foreignKey: "CodigoEmpresa"});
-  ContactanosPortada.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(ContactanosPortada, { as: "ContactanosPortadas", foreignKey: "CodigoEmpresa"});
-  EmpresaPortada.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(EmpresaPortada, { as: "EmpresaPortadas", foreignKey: "CodigoEmpresa"});
-  Footer.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(Footer, { as: "Footers", foreignKey: "CodigoEmpresa"});
-  MenuPortada.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(MenuPortada, { as: "MenuPortadas", foreignKey: "CodigoEmpresa"});
-  Navbar.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(Navbar, { as: "Navbars", foreignKey: "CodigoEmpresa"});
-  PortadaOtro.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(PortadaOtro, { as: "PortadaOtros", foreignKey: "CodigoEmpresa"});
-  ProductoPortada.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(ProductoPortada, { as: "ProductoPortadas", foreignKey: "CodigoEmpresa"});
-  ReporteRedSocialPortada.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(ReporteRedSocialPortada, { as: "ReporteRedSocialPortadas", foreignKey: "CodigoEmpresa"});
-  ReporteTiempoPaginaPortada.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(ReporteTiempoPaginaPortada, { as: "ReporteTiempoPaginaPortadas", foreignKey: "CodigoEmpresa"});
-  ReporteVistaPortada.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(ReporteVistaPortada, { as: "ReporteVistaPortadas", foreignKey: "CodigoEmpresa"});
+  Cliente.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
+  Empresa.hasMany(Cliente, { as: "Clientes", foreignKey: "CodigoEmpresa"});
+  Producto.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
+  Empresa.hasMany(Producto, { as: "Productos", foreignKey: "CodigoEmpresa"});
+  Pago.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
+  Empresa.hasMany(Pago, { as: "Pagos", foreignKey: "CodigoEmpresa"});
+  Inventario.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
+  Empresa.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoEmpresa"});
+  MovimientoInventario.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
+  Empresa.hasMany(MovimientoInventario, { as: "MovimientoInventarios", foreignKey: "CodigoEmpresa"});
+  Pedido.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
+  Empresa.hasMany(Pedido, { as: "Pedidos", foreignKey: "CodigoEmpresa"});
   PermisoRolRecurso.belongsTo(Permiso, { as: "CodigoPermiso_Permiso", foreignKey: "CodigoPermiso"});
   Permiso.hasMany(PermisoRolRecurso, { as: "PermisoRolRecursos", foreignKey: "CodigoPermiso"});
   PermisoRolRecurso.belongsTo(Recurso, { as: "CodigoRecurso_Recurso", foreignKey: "CodigoRecurso"});
@@ -120,56 +90,96 @@ function initModels(sequelize) {
   Rol.hasMany(PermisoRolRecurso, { as: "PermisoRolRecursos", foreignKey: "CodigoRol"});
   Usuario.belongsTo(Rol, { as: "CodigoRol_Rol", foreignKey: "CodigoRol"});
   Rol.hasMany(Usuario, { as: "Usuarios", foreignKey: "CodigoRol"});
-  CarruselImagen.belongsTo(Carrusel, { as: "CodigoCarrusel_Carrusel", foreignKey: "CodigoCarrusel"});
-  Carrusel.hasMany(CarruselImagen, { as: "CarruselImagens", foreignKey: "CodigoCarrusel"});
-  Producto.belongsTo(ClasificacionProducto, { as: "CodigoClasificacionProducto_ClasificacionProducto", foreignKey: "CodigoClasificacionProducto"});
-  ClasificacionProducto.hasMany(Producto, { as: "Productos", foreignKey: "CodigoClasificacionProducto"});
-  LogoImagen.belongsTo(Logo, { as: "CodigoLogo_Logo", foreignKey: "CodigoLogo"});
-  Logo.hasMany(LogoImagen, { as: "LogoImagens", foreignKey: "CodigoLogo"});
-  ReporteProducto.belongsTo(Producto, { as: "CodigoProducto_Producto", foreignKey: "CodigoProducto"});
-  Producto.hasMany(ReporteProducto, { as: "ReporteProductos", foreignKey: "CodigoProducto"});
-  ReporteRedSocial.belongsTo(RedSocial, { as: "CodigoRedSocial_RedSocial", foreignKey: "CodigoRedSocial"});
-  RedSocial.hasMany(ReporteRedSocial, { as: "ReporteRedSocials", foreignKey: "CodigoRedSocial"});
-  RedSocialImagen.belongsTo(RedSocial, { as: "CodigoRedSocial_RedSocial", foreignKey: "CodigoRedSocial"});
-  RedSocial.hasMany(RedSocialImagen, { as: "RedSocialImagens", foreignKey: "CodigoRedSocial"});
-  AlertaEstiloBoton.belongsTo(AlertaEstilo, { as: "CodigoAlertaEstilo_AlertaEstilo", foreignKey: "CodigoAlertaEstilo"});
-  AlertaEstilo.hasMany(AlertaEstiloBoton, { as: "AlertaEstiloBotons", foreignKey: "CodigoAlertaEstilo"});
+  MovimientoInventario.belongsTo(Usuario, { as: "CodigoUsuario_Usuario", foreignKey: "CodigoUsuario"});
+  Usuario.hasMany(MovimientoInventario, { as: "MovimientoInventarios", foreignKey: "CodigoUsuario"});
+  Pedido.belongsTo(Usuario, { as: "CodigoUsuario_Usuario", foreignKey: "CodigoUsuario"});
+  Usuario.hasMany(Pedido, { as: "Pedidos", foreignKey: "CodigoUsuario"});
+  PedidoDetalle.belongsTo(Abertura, { as: "CodigoAbertura_Abertura", foreignKey: "CodigoAbertura"});
+  Abertura.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoAbertura"});
+  PedidoDetalle.belongsTo(Boton, { as: "CodigoBoton_Boton", foreignKey: "CodigoBoton"});
+  Boton.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoBoton"});
+  Producto.belongsTo(Categoria, { as: "CodigoCategoria_Categorium", foreignKey: "CodigoCategoria"});
+  Categoria.hasMany(Producto, { as: "Productos", foreignKey: "CodigoCategoria"});
+  Pedido.belongsTo(Cliente, { as: "CodigoCliente_Cliente", foreignKey: "CodigoCliente"});
+  Cliente.hasMany(Pedido, { as: "Pedidos", foreignKey: "CodigoCliente"});
+  Inventario.belongsTo(Color, { as: "CodigoColor_Color", foreignKey: "CodigoColor"});
+  Color.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoColor"});
+  Pedido.belongsTo(EstadoPedido, { as: "CodigoEstadoPedido_EstadoPedido", foreignKey: "CodigoEstadoPedido"});
+  EstadoPedido.hasMany(Pedido, { as: "Pedidos", foreignKey: "CodigoEstadoPedido"});
+  Inventario.belongsTo(Estilo, { as: "CodigoEstilo_Estilo", foreignKey: "CodigoEstilo"});
+  Estilo.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoEstilo"});
+  Pago.belongsTo(FormaPago, { as: "CodigoFormaPago_FormaPago", foreignKey: "CodigoFormaPago"});
+  FormaPago.hasMany(Pago, { as: "Pagos", foreignKey: "CodigoFormaPago"});
+  Inventario.belongsTo(Marca, { as: "CodigoMarca_Marca", foreignKey: "CodigoMarca"});
+  Marca.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoMarca"});
+  Inventario.belongsTo(Producto, { as: "CodigoProducto_Producto", foreignKey: "CodigoProducto"});
+  Producto.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoProducto"});
+  Inventario.belongsTo(Talla, { as: "CodigoTalla_Talla", foreignKey: "CodigoTalla"});
+  Talla.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoTalla"});
+  Inventario.belongsTo(Tamano, { as: "CodigoTamano_Tamano", foreignKey: "CodigoTamano"});
+  Tamano.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoTamano"});
+  PedidoDetalle.belongsTo(Tela, { as: "CodigoTela_Tela", foreignKey: "CodigoTela"});
+  Tela.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoTela"});
+  PedidoDetalle.belongsTo(TipoCorte, { as: "CodigoTipoCorte_TipoCorte", foreignKey: "CodigoTipoCorte"});
+  TipoCorte.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoTipoCorte"});
+  PedidoDetalle.belongsTo(TipoCuello, { as: "CodigoTipoCuello_TipoCuello", foreignKey: "CodigoTipoCuello"});
+  TipoCuello.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoTipoCuello"});
+  Empresa.belongsTo(TipoEmpresa, { as: "CodigoTipoEmpresa_TipoEmpresa", foreignKey: "CodigoTipoEmpresa"});
+  TipoEmpresa.hasMany(Empresa, { as: "Empresas", foreignKey: "CodigoTipoEmpresa"});
+  PedidoDetalleMedida.belongsTo(TipoMedida, { as: "CodigoTipoMedida_TipoMedida", foreignKey: "CodigoTipoMedida"});
+  TipoMedida.hasMany(PedidoDetalleMedida, { as: "PedidoDetalleMedidas", foreignKey: "CodigoTipoMedida"});
+  Producto.belongsTo(TipoProducto, { as: "CodigoTipoProducto_TipoProducto", foreignKey: "CodigoTipoProducto"});
+  TipoProducto.hasMany(Producto, { as: "Productos", foreignKey: "CodigoTipoProducto"});
+  PedidoDetalle.belongsTo(TipoSolapa, { as: "CodigoTipoSolapa_TipoSolapa", foreignKey: "CodigoTipoSolapa"});
+  TipoSolapa.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoTipoSolapa"});
+  Tela.belongsTo(TipoTela, { as: "CodigoTipoTela_TipoTela", foreignKey: "CodigoTipoTela"});
+  TipoTela.hasMany(Tela, { as: "Telas", foreignKey: "CodigoTipoTela"});
+  PedidoDetalle.belongsTo(TipoTela, { as: "CodigoTipoTela_TipoTela", foreignKey: "CodigoTipoTela"});
+  TipoTela.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoTipoTela"});
+  PagoAplicacion.belongsTo(Pago, { as: "CodigoPago_Pago", foreignKey: "CodigoPago"});
+  Pago.hasMany(PagoAplicacion, { as: "PagoAplicacions", foreignKey: "CodigoPago"});
+  MovimientoInventario.belongsTo(Inventario, { as: "CodigoInventario_Inventario", foreignKey: "CodigoInventario"});
+  Inventario.hasMany(MovimientoInventario, { as: "MovimientoInventarios", foreignKey: "CodigoInventario"});
+  PedidoDetalle.belongsTo(Inventario, { as: "CodigoInventario_Inventario", foreignKey: "CodigoInventario"});
+  Inventario.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoInventario"});
+  PedidoDetalle.belongsTo(Pedido, { as: "CodigoPedido_Pedido", foreignKey: "CodigoPedido"});
+  Pedido.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoPedido"});
+  PedidoDetalleMedida.belongsTo(PedidoDetalle, { as: "CodigoPedidoDetalle_PedidoDetalle", foreignKey: "CodigoPedidoDetalle"});
+  PedidoDetalle.hasMany(PedidoDetalleMedida, { as: "PedidoDetalleMedidas", foreignKey: "CodigoPedidoDetalle"});
 
   return {
-    AlertaEstilo,
-    AlertaEstiloBoton,
-    CarritoPortada,
-    Carrusel,
-    CarruselImagen,
-    ClasificacionProducto,
-    ContactanosPortada,
+    Abertura,
+    Boton,
+    Categoria,
+    Cliente,
+    Color,
     Empresa,
-    EmpresaPortada,
-    Footer,
-    Icono,
-    LoginPortada,
-    Logo,
-    LogoImagen,
-    MenuPortada,
-    Navbar,
-    Otro,
+    EstadoPedido,
+    Estilo,
+    FormaPago,
+    Inventario,
+    Marca,
+    MovimientoInventario,
     Pago,
+    PagoAplicacion,
+    Pedido,
+    PedidoDetalle,
+    PedidoDetalleMedida,
     Permiso,
     PermisoRolRecurso,
-    PortadaOtro,
     Producto,
-    ProductoPortada,
     Recurso,
-    RedSocial,
-    RedSocialImagen,
-    ReporteProducto,
-    ReporteRedSocial,
-    ReporteRedSocialPortada,
-    ReporteTiempoPagina,
-    ReporteTiempoPaginaPortada,
-    ReporteVista,
-    ReporteVistaPortada,
     Rol,
+    Talla,
+    Tamano,
+    Tela,
+    TipoCorte,
+    TipoCuello,
+    TipoEmpresa,
+    TipoMedida,
+    TipoProducto,
+    TipoSolapa,
+    TipoTela,
     Usuario,
   };
 }

@@ -1,7 +1,7 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('Pago', {
-    CodigoPago: {
+  return sequelize.define('MovimientoInventario', {
+    CodigoMovimientoInventario: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -15,59 +15,66 @@ module.exports = function(sequelize, DataTypes) {
         key: 'CodigoEmpresa'
       }
     },
-    CodigoFormaPago: {
+    CodigoInventario: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'FormaPago',
-        key: 'CodigoFormaPago'
+        model: 'Inventario',
+        key: 'CodigoInventario'
       }
     },
     CodigoUsuario: {
       type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'Usuario',
+        key: 'CodigoUsuario'
+      }
+    },
+    TipoMovimiento: {
+      type: DataTypes.STRING(20),
       allowNull: false
     },
-    FechaPago: {
-      type: DataTypes.DATE,
+    OrigenMovimiento: {
+      type: DataTypes.STRING(20),
       allowNull: false
     },
-    Monto: {
-      type: DataTypes.DECIMAL(12,2),
-      allowNull: false
-    },
-    NumeroComprobante: {
-      type: DataTypes.STRING(64),
+    CodigoDocumento: {
+      type: DataTypes.INTEGER,
       allowNull: true
     },
-    UrlImagen: {
-      type: DataTypes.STRING(256),
-      allowNull: true
+    Cantidad: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+    StockAnterior: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+    StockNuevo: {
+      type: DataTypes.INTEGER,
+      allowNull: false
     },
     Observacion: {
       type: DataTypes.STRING(256),
       allowNull: true
     },
-    Estatus: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: true
-    },
-    FechaCreacion: {
+    FechaMovimiento: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: Sequelize.Sequelize.fn('sysdatetime')
     }
   }, {
     sequelize,
-    tableName: 'Pago',
-    schema: 'Fn',
+    tableName: 'MovimientoInventario',
+    schema: 'Inv',
     timestamps: false,
     indexes: [
       {
-        name: "PK_Fn_Pago",
+        name: "PK_Inv_MovimientoInventario",
         unique: true,
         fields: [
-          { name: "CodigoPago" },
+          { name: "CodigoMovimientoInventario" },
         ]
       },
     ]

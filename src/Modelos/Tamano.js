@@ -1,25 +1,14 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('LogoImagen', {
-    CodigoLogoImagen: {
+  return sequelize.define('Tamano', {
+    CodigoTamano: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
       allowNull: false,
-      primaryKey: true
+      primaryKey: true,
+      unique: "Uq_CaTamano_NombreTamano"
     },
-    CodigoLogo: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'Logo',
-        key: 'CodigoLogo'
-      }
-    },
-    UrlImagen: {
-      type: DataTypes.STRING(256),
-      allowNull: false
-    },
-    Ubicacion: {
+    NombreTamano: {
       type: DataTypes.STRING(64),
       allowNull: false
     },
@@ -30,15 +19,22 @@ module.exports = function(sequelize, DataTypes) {
     }
   }, {
     sequelize,
-    tableName: 'LogoImagen',
-    schema: 'Ui',
+    tableName: 'Tamano',
+    schema: 'Ca',
     timestamps: false,
     indexes: [
       {
-        name: "Pk_UiLogoImagen_CodigoLogoImagen",
+        name: "Pk_CaTamano_CodigoTamano",
         unique: true,
         fields: [
-          { name: "CodigoLogoImagen" },
+          { name: "CodigoTamano" },
+        ]
+      },
+      {
+        name: "Uq_CaTamano_NombreTamano",
+        unique: true,
+        fields: [
+          { name: "CodigoTamano" },
         ]
       },
     ]

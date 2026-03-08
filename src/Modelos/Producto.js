@@ -7,31 +7,38 @@ module.exports = function(sequelize, DataTypes) {
       allowNull: false,
       primaryKey: true
     },
-    CodigoClasificacionProducto: {
+    CodigoEmpresa: {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'ClasificacionProducto',
-        key: 'CodigoClasificacionProducto'
-      },
-      unique: "Uq_CaProducto_NombreProducto"
+        model: 'Empresa',
+        key: 'CodigoEmpresa'
+      }
+    },
+    CodigoTipoProducto: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'TipoProducto',
+        key: 'CodigoTipoProducto'
+      }
+    },
+    CodigoCategoria: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'Categoria',
+        key: 'CodigoCategoria'
+      }
     },
     NombreProducto: {
       type: DataTypes.STRING(64),
-      allowNull: true,
+      allowNull: false,
       unique: "Uq_CaProducto_NombreProducto"
     },
-    Moneda: {
-      type: DataTypes.STRING(8),
+    PrecioBase: {
+      type: DataTypes.DECIMAL(10,2),
       allowNull: true
-    },
-    Precio: {
-      type: DataTypes.DECIMAL(10,1),
-      allowNull: true
-    },
-    UrlImagen: {
-      type: DataTypes.STRING(256),
-      allowNull: false
     },
     Estatus: {
       type: DataTypes.TINYINT,
@@ -55,7 +62,6 @@ module.exports = function(sequelize, DataTypes) {
         name: "Uq_CaProducto_NombreProducto",
         unique: true,
         fields: [
-          { name: "CodigoClasificacionProducto" },
           { name: "NombreProducto" },
         ]
       },

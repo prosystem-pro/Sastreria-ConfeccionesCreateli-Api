@@ -1,24 +1,16 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('Icono', {
-    CodigoIcono: {
+  return sequelize.define('Marca', {
+    CodigoMarca: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true
     },
-    CodigoEmpresa: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'Empresa',
-        key: 'CodigoEmpresa'
-      }
-    },
-    NombreIcono: {
+    NombreMarca: {
       type: DataTypes.STRING(64),
       allowNull: false,
-      unique: "Uq_CaIcono_NombreIcono"
+      unique: "Uq_CaMarca_NombreMarca"
     },
     Estatus: {
       type: DataTypes.TINYINT,
@@ -27,22 +19,22 @@ module.exports = function(sequelize, DataTypes) {
     }
   }, {
     sequelize,
-    tableName: 'Icono',
+    tableName: 'Marca',
     schema: 'Ca',
     timestamps: false,
     indexes: [
       {
-        name: "Pk_CaIcono_CodigoIcono",
+        name: "Pk_CaMarca_CodigoMarca",
         unique: true,
         fields: [
-          { name: "CodigoIcono" },
+          { name: "CodigoMarca" },
         ]
       },
       {
-        name: "Uq_CaIcono_NombreIcono",
+        name: "Uq_CaMarca_NombreMarca",
         unique: true,
         fields: [
-          { name: "NombreIcono" },
+          { name: "NombreMarca" },
         ]
       },
     ]

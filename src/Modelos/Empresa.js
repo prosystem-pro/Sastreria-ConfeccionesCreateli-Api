@@ -7,21 +7,57 @@ module.exports = function(sequelize, DataTypes) {
       allowNull: false,
       primaryKey: true
     },
+    CodigoTipoEmpresa: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'TipoEmpresa',
+        key: 'CodigoTipoEmpresa'
+      }
+    },
     NombreEmpresa: {
       type: DataTypes.STRING(64),
-      allowNull: false,
+      allowNull: true,
       unique: "Uq_AdEmpresa_NombreEmpresa"
+    },
+    RazonSocial: {
+      type: DataTypes.STRING(256),
+      allowNull: true
+    },
+    NIT: {
+      type: DataTypes.STRING(32),
+      allowNull: true
+    },
+    NombrePropietario: {
+      type: DataTypes.STRING(64),
+      allowNull: true
+    },
+    Correo: {
+      type: DataTypes.STRING(256),
+      allowNull: true
     },
     Direccion: {
       type: DataTypes.STRING(256),
       allowNull: false
     },
-    Eslogan: {
-      type: DataTypes.STRING(128),
+    Telefono: {
+      type: DataTypes.STRING(16),
       allowNull: false
     },
-    Celular: {
-      type: DataTypes.STRING(16),
+    Departamento: {
+      type: DataTypes.STRING(32),
+      allowNull: true
+    },
+    Municipio: {
+      type: DataTypes.STRING(32),
+      allowNull: true
+    },
+    ImagenUrl: {
+      type: DataTypes.STRING(256),
+      allowNull: true
+    },
+    Eslogan: {
+      type: DataTypes.STRING(128),
       allowNull: false
     },
     Estatus: {
