@@ -6,6 +6,16 @@ const { LanzarError } = require('../Utilidades/ErrorServicios');
 const NombreModelo = 'NombreEmpresa';
 const CodigoModelo = 'CodigoEmpresa'
 
+const ObtenerEmpresaPrincipal = async () => {
+  return await Modelo.findAll({
+    where: {
+      TipoEmpresa: 1,
+      Estatus: [1, 2]
+    },
+    order: [[NombreModelo, 'ASC']]
+  });
+};
+
 const Listado = async () => {
   return await Modelo.findAll({ where: { Estatus: [1, 2] } });
 };
@@ -32,7 +42,6 @@ const Crear = async (Datos) => {
   return await Modelo.create(Datos);
 };
 
-
 const Editar = async (Codigo, Datos) => {
   const Objeto = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
   if (!Objeto) LanzarError('Registro no encontrado', 404);
@@ -48,4 +57,6 @@ const Eliminar = async (Codigo) => {
 };
 
 
-module.exports = { Listado, ObtenerPorCodigo, Buscar, Crear, Editar, Eliminar };
+module.exports = { Listado, ObtenerPorCodigo, Buscar, Crear, Editar, Eliminar,
+  ObtenerEmpresaPrincipal
+ };

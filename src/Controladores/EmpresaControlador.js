@@ -2,6 +2,15 @@ const Servicio = require('../Servicios/EmpresaServicio');
 const ManejarError = require('../Utilidades/ErrorControladores');
 const ResponderExito = require('../Utilidades/RespuestaExitosaControlador');
 
+const ObtenerEmpresaPrincipal = async (req, res) => {
+  try {
+    const Objeto = await Servicio.ObtenerEmpresasTipo1();
+    return ResponderExito(res, 'Empresas tipo 1 obtenidas correctamente.', Objeto || []);
+  } catch (error) {
+    return ManejarError(error, res, 'Error al obtener las empresas tipo 1');
+  }
+};
+
 const Listado = async (req, res) => {
   try {
     const Objeto = await Servicio.Listado();
@@ -61,4 +70,4 @@ const Eliminar = async (req, res) => {
 };
 
 
-module.exports = { Listado, ObtenerPorCodigo, Buscar, Crear, Editar, Eliminar };
+module.exports = { Listado, ObtenerPorCodigo, Buscar, Crear, Editar, Eliminar, ObtenerEmpresaPrincipal };

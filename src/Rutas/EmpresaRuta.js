@@ -2,11 +2,12 @@ const Express = require('express');
 const Router = Express.Router();
 const Modelo = 'empresa';
 const Tabla = 'Empresa'
-const { Listado, ObtenerPorCodigo, Buscar, Crear, Editar, Eliminar } = require('../Controladores/EmpresaControlador');
+const { Listado, ObtenerPorCodigo, Buscar, Crear, Editar, Eliminar, ObtenerEmpresaPrincipal } = require('../Controladores/EmpresaControlador');
 const VerificarToken = require('../FuncionIntermedia/VerificarToken');
 const VerificarPermisos = require('../FuncionIntermedia/VerificarPermisos'); 
 
 Router.get(`/${Modelo}/listado`, Listado);
+Router.get(`/${Modelo}/principal`, VerificarToken,VerificarPermisos('EmpresaPrincipal',Tabla), ObtenerEmpresaPrincipal);
 Router.get(`/${Modelo}/:Codigo`,VerificarToken,VerificarPermisos('VerUnidad',Tabla), ObtenerPorCodigo);
 Router.get(`/${Modelo}/buscar/:TipoBusqueda/:ValorBusqueda`,VerificarToken,VerificarPermisos('Buscar',Tabla), Buscar);
 Router.post(`/${Modelo}/crear`, VerificarToken,VerificarPermisos('Crear',Tabla),Crear);
