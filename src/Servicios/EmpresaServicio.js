@@ -9,7 +9,7 @@ const CodigoModelo = 'CodigoEmpresa'
 const ObtenerEmpresaPrincipal = async () => {
   return await Modelo.findAll({
     where: {
-      TipoEmpresa: 1,
+      CodigoTipoEmpresa: 1,
       Estatus: [1, 2]
     },
     order: [[NombreModelo, 'ASC']]

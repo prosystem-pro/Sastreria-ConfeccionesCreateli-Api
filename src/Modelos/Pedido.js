@@ -47,7 +47,7 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.DATE,
       allowNull: true
     },
-    Subtotoal: {
+    Subtotal: {
       type: DataTypes.DECIMAL(18,2),
       allowNull: true
     },

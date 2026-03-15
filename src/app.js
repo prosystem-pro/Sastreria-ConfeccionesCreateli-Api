@@ -12,6 +12,10 @@ const PermisoRuta = require("./Rutas/PermisoRuta");
 const PermisoRolRecursoRuta = require("./Rutas/PermisoRolRecursoRuta");
 const RecursoRuta = require("./Rutas/RecursoRuta");
 const Login = require("./Rutas/LoginRuta");
+//GENERAL
+const ClienteRuta = require("./Rutas/ClienteRuta");
+const HistorialPedidoRuta = require("./Rutas/HistorialPedidoRuta");
+
 const Ruter = 'api';
 const CuerpoJson = require('./FuncionIntermedia/CuerpoJson');
 const CuerpoUrlCodificado = require('./FuncionIntermedia/CuerpoUrlCodificado');
@@ -33,5 +37,9 @@ App.use(`/${Ruter}`, RolRuta);
 App.use(`/${Ruter}`, PermisoRuta);
 App.use(`/${Ruter}`, PermisoRolRecursoRuta);
 App.use(`/${Ruter}`, RecursoRuta);
+
+//GENERAL
+App.use(`/${Ruter}`, ClienteRuta);
+App.use(`/${Ruter}`, HistorialPedidoRuta);
 
 module.exports = App;
