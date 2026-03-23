@@ -83,6 +83,18 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.INTEGER,
       allowNull: false
     },
+    Codigo: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    Color: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    Referencia: {
+      type: DataTypes.STRING(100),
+      allowNull: true
+    },
     PrecioVenta: {
       type: DataTypes.DECIMAL(18,2),
       allowNull: false

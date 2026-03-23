@@ -38,25 +38,29 @@ const Crear = async (datos) => {
 };
 
 const Obtener = async (codigo) => {
-
     try {
-
         const registro = await Modelo.findOne({
             where: {
                 [CodigoModelo]: codigo,
                 Estatus: [1, 2]
             }
         });
+
         if (!registro) {
-            LanzarError('Cliente no encontrado');
+            // Cliente no encontrado → 404
+            LanzarError('Cliente no encontrado', 404, 'Alerta');
         }
 
         return registro;
 
     } catch (error) {
-        LanzarError('Error al obtener cliente', error);
+        // Si ya es un error lanzado con LanzarError, relánzalo tal cual
+        if (error.statusCode && typeof error.statusCode === 'number') {
+            throw error;
+        }
+        // Cualquier otro error inesperado → 500
+        LanzarError('Error al obtener cliente', 500, 'Error');
     }
-
 };
 
 const Editar = async (codigo, datos) => {

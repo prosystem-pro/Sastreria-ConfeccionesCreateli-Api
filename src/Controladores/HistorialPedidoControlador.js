@@ -4,6 +4,68 @@ const Servicio = require('../Servicios/HistorialPedidoServicio');
 const ManejarError = require('../Utilidades/ErrorControladores');
 const ResponderExito = require('../Utilidades/RespuestaExitosaControlador');
 
+const ListarPagosPorPedido = async (req, res) => {
+  try {
+
+    const { CodigoPedido } = req.params;
+
+    if (!CodigoPedido) {
+      LanzarError(
+        'El código de pedido es obligatorio',
+        400,
+        'Advertencia'
+      );
+    }
+
+    const pagos = await Servicio.ListarPagosPorPedido(
+      Number(CodigoPedido)
+    );
+
+    return ResponderExito(
+      res,
+      'Pagos del pedido obtenidos correctamente.',
+      pagos || []
+    );
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al obtener pagos del pedido'
+    );
+
+  }
+};
+
+const RegistrarPagoPedido = async (req, res) => {
+  try {
+
+    const datos = req.body;
+    const CodigoUsuario = req.Datos.CodigoUsuario;
+
+    const Objeto = await Servicio.RegistrarPagoPedido(
+      datos,
+      CodigoUsuario
+    );
+
+    return ResponderExito(
+      res,
+      'Pago registrado correctamente.',
+      Objeto || {}
+    );
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al registrar el pago del pedido'
+    );
+
+  }
+};
+
 const Listado = async (req, res) => {
   try {
     const Objeto = await Servicio.Listado();
@@ -101,14 +163,43 @@ const ListadoTela = async (req, res) => {
 
 const ListadoProducto = async (req, res) => {
   try {
-    const productos = await Servicio.ListadoProducto();
+
+    const { CodigoTipoProducto } = req.query;
+
+    const productos = await Servicio.ListadoProducto(
+      CodigoTipoProducto ? Number(CodigoTipoProducto) : null
+    );
+
     return ResponderExito(
       res,
       'Productos obtenidos correctamente.',
       productos || []
     );
+
   } catch (error) {
     return ManejarError(error, res, 'Error al obtener productos');
+  }
+};
+
+const ListadoTipoCuello = async (req, res) => {
+  try {
+
+    const tiposCuello = await Servicio.ListadoTipoCuello();
+
+    return ResponderExito(
+      res,
+      'Tipos de cuello obtenidos correctamente.',
+      tiposCuello || []
+    );
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al obtener tipos de cuello'
+    );
+
   }
 };
 
@@ -152,6 +243,109 @@ const ListadoCliente = async (req, res) => {
   }
 };
 
+const ListadoFormaPago = async (req, res) => {
+  try {
+    const formasPago = await Servicio.ListadoFormaPago();
+
+    return ResponderExito(
+      res,
+      'Formas de pago obtenidas correctamente.',
+      formasPago || []
+    );
+
+  } catch (error) {
+    return ManejarError(error, res, 'Error al obtener formas de pago');
+  }
+};
+
+const CrearPedido = async (req, res) => {
+  try {
+
+    const datos = req.body;
+    console.log(JSON.stringify(datos, null, 2));
+    const CodigoUsuario = req.Datos.CodigoUsuario;
+
+    const Objeto = await Servicio.CrearPedido(datos, CodigoUsuario);
+
+    return ResponderExito(
+      res,
+      'Pedido creado correctamente.',
+      Objeto || {}
+    );
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al crear el pedido'
+    );
+
+  }
+};
+
+const ObtenerPedido = async (req, res) => {
+  try {
+
+    const { CodigoPedido } = req.params;
+
+    if (!CodigoPedido) {
+      LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+    }
+
+    const Objeto = await Servicio.ObtenerPedido(CodigoPedido);
+
+    return ResponderExito(
+      res,
+      'Pedido obtenido correctamente.',
+      Objeto || {}
+    );
+
+  } catch (error) {
+    // 🔥 Manejo de error siguiendo el estándar
+    return ManejarError(
+      error,
+      res,
+      'Error al obtener el pedido'
+    );
+  }
+};
+
+const ActualizarPedido = async (req, res) => {
+  try {
+
+    const datos = req.body;
+
+    console.log('BODY RECIBIDO EN ACTUALIZAR:');
+    console.log(JSON.stringify(datos, null, 2));
+
+    const CodigoUsuario = req.Datos.CodigoUsuario;
+
+    if (!datos.CodigoPedido) {
+      LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+    }
+
+    const Objeto = await Servicio.ActualizarPedido(datos, CodigoUsuario);
+
+    return ResponderExito(
+      res,
+      'Pedido actualizado correctamente.',
+      Objeto || {}
+    );
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al actualizar el pedido'
+    );
+
+  }
+};
+
 module.exports = {
-  Listado, Obtener, ListadoTipoProducto, ListadoTipoTela, ListadoTela, ListadoProducto, ObtenerProducto, ListadoCliente
+  Listado, Obtener, ListadoTipoProducto, ListadoTipoTela, ListadoTela, 
+  ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido,ListadoTipoCuello, ObtenerPedido,
+  ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido
 };

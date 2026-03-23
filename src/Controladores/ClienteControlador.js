@@ -34,21 +34,22 @@ const Crear = async (req, res) => {
 
 const Obtener = async (req, res) => {
   try {
-
     const Codigo = req.params.codigo;
+
+    if (!Codigo) {
+      LanzarError('El código de cliente es obligatorio', 400, 'Advertencia');
+    }
 
     const Objeto = await Servicio.Obtener(Codigo);
 
     return ResponderExito(
       res,
       'Cliente obtenido correctamente.',
-      Objeto
+      Objeto || {}
     );
 
   } catch (error) {
-
     return ManejarError(error, res, 'Error al obtener el cliente');
-
   }
 };
 
