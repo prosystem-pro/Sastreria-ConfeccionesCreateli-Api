@@ -4,6 +4,40 @@ const Servicio = require('../Servicios/HistorialPedidoServicio');
 const ManejarError = require('../Utilidades/ErrorControladores');
 const ResponderExito = require('../Utilidades/RespuestaExitosaControlador');
 
+const EliminarPedido = async (req, res) => {
+  try {
+
+    const { CodigoPedido } = req.params;
+
+    if (!CodigoPedido) {
+      LanzarError(
+        'El código de pedido es obligatorio',
+        400,
+        'Advertencia'
+      );
+    }
+
+    const Objeto = await Servicio.EliminarPedido(
+      Number(CodigoPedido)
+    );
+
+    return ResponderExito(
+      res,
+      'Pedido eliminado correctamente.',
+      Objeto || {}
+    );
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al eliminar el pedido'
+    );
+
+  }
+};
+
 const ListarPagosPorPedido = async (req, res) => {
   try {
 
@@ -72,6 +106,28 @@ const Listado = async (req, res) => {
     return ResponderExito(res, 'Listado de pedidos obtenido correctamente.', Objeto || []);
   } catch (error) {
     return ManejarError(error, res, 'Error al obtener los pedidos');
+  }
+};
+
+const ListadoEntregados = async (req, res) => {
+  try {
+
+    const Objeto = await Servicio.ListadoEntregados();
+
+    return ResponderExito(
+      res,
+      'Listado de pedidos entregados obtenido correctamente.',
+      Objeto || []
+    );
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al obtener los pedidos entregados'
+    );
+
   }
 };
 
@@ -203,6 +259,28 @@ const ListadoTipoCuello = async (req, res) => {
   }
 };
 
+const ListadoEstadoPedido = async (req, res) => {
+  try {
+
+    const estadosPedido = await Servicio.ListadoEstadoPedido();
+
+    return ResponderExito(
+      res,
+      'Estados de pedido obtenidos correctamente.',
+      estadosPedido || []
+    );
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al obtener estados de pedido'
+    );
+
+  }
+};
+
 const ObtenerProducto = async (req, res) => {
   try {
     const { codigo } = req.params;
@@ -262,7 +340,6 @@ const CrearPedido = async (req, res) => {
   try {
 
     const datos = req.body;
-    console.log(JSON.stringify(datos, null, 2));
     const CodigoUsuario = req.Datos.CodigoUsuario;
 
     const Objeto = await Servicio.CrearPedido(datos, CodigoUsuario);
@@ -316,9 +393,6 @@ const ActualizarPedido = async (req, res) => {
 
     const datos = req.body;
 
-    console.log('BODY RECIBIDO EN ACTUALIZAR:');
-    console.log(JSON.stringify(datos, null, 2));
-
     const CodigoUsuario = req.Datos.CodigoUsuario;
 
     if (!datos.CodigoPedido) {
@@ -347,5 +421,6 @@ const ActualizarPedido = async (req, res) => {
 module.exports = {
   Listado, Obtener, ListadoTipoProducto, ListadoTipoTela, ListadoTela, 
   ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido,ListadoTipoCuello, ObtenerPedido,
-  ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido
+  ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido, EliminarPedido, 
+  ListadoEstadoPedido, ListadoEntregados
 };

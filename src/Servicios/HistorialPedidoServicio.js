@@ -12,12 +12,123 @@ const Tela = require('../Modelos/Tela')(BaseDatos, Sequelize.DataTypes);
 const Producto = require('../Modelos/Producto')(BaseDatos, Sequelize.DataTypes);
 const Cliente = require('../Modelos/Cliente')(BaseDatos, Sequelize.DataTypes);
 const TipoCuello = require('../Modelos/TipoCuello')(BaseDatos, Sequelize.DataTypes);
+const EstadoPedido = require('../Modelos/EstadoPedido')(BaseDatos, Sequelize.DataTypes);
 const PedidoDetalle = require('../Modelos/PedidoDetalle')(BaseDatos, Sequelize.DataTypes);
 const PedidoDetalleMedida = require('../Modelos/PedidoDetalleMedida')(BaseDatos, Sequelize.DataTypes);
 const TipoMedida = require('../Modelos/TipoMedida')(BaseDatos, Sequelize.DataTypes);
 const FormaPago = require('../Modelos/FormaPago')(BaseDatos, Sequelize.DataTypes);
 const { LanzarError } = require('../Utilidades/ErrorServicios');
 const { Op } = require('sequelize');
+
+const EliminarPedido = async (CodigoPedido) => {
+
+    const transaccion = await BaseDatos.transaction();
+
+    try {
+
+        if (!CodigoPedido)
+            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+
+        // ===================== PEDIDO =====================
+        const pedido = await PedidoModelo.findOne({
+            where: { CodigoPedido },
+            transaction: transaccion
+        });
+
+        if (!pedido)
+            LanzarError('El pedido no existe', 404, 'Advertencia');
+
+
+        // ===================== DETALLES =====================
+        const detalles = await PedidoDetalleModelo.findAll({
+            where: { CodigoPedido },
+            transaction: transaccion
+        });
+
+        for (const detalle of detalles) {
+
+            // 🔄 Restaurar inventario
+            const inventario = await InventarioModelo.findOne({
+                where: {
+                    CodigoInventario: detalle.CodigoInventario
+                },
+                transaction: transaccion
+            });
+
+            if (inventario) {
+
+                await inventario.update({
+                    StockActual: inventario.StockActual + detalle.Cantidad
+                }, { transaction: transaccion });
+
+            }
+
+            // 🗑️ Eliminar medidas
+            await PedidoDetalleMedidaModelo.destroy({
+                where: {
+                    CodigoPedidoDetalle: detalle.CodigoPedidoDetalle
+                },
+                transaction: transaccion
+            });
+
+            // 🗑️ Eliminar detalle
+            await detalle.destroy({
+                transaction: transaccion
+            });
+        }
+
+
+        // ===================== PAGOS =====================
+        const pagosAplicados = await PagoAplicacionModelo.findAll({
+            where: {
+                TipoDocumento: 'PEDIDO',
+                CodigoDocumento: CodigoPedido
+            },
+            transaction: transaccion
+        });
+
+        for (const pagoAplicacion of pagosAplicados) {
+
+            // 🗑️ Eliminar PagoAplicacion
+            await pagoAplicacion.destroy({
+                transaction: transaccion
+            });
+
+            // 🗑️ Eliminar Pago
+            await PagoModelo.destroy({
+                where: {
+                    CodigoPago: pagoAplicacion.CodigoPago
+                },
+                transaction: transaccion
+            });
+        }
+
+
+        // ===================== PEDIDO =====================
+        await pedido.destroy({
+            transaction: transaccion
+        });
+
+
+        await transaccion.commit();
+
+        return {
+            CodigoPedido,
+            TotalDetalles: detalles.length,
+            TotalPagos: pagosAplicados.length,
+            Mensaje: 'Pedido eliminado completamente'
+        };
+
+    } catch (error) {
+
+        try {
+            await transaccion.rollback();
+        } catch (_) { }
+
+        console.error(error);
+        throw error;
+    }
+};
 
 const ListarPagosPorPedido = async (codigoPedido) => {
 
@@ -396,7 +507,8 @@ const ObtenerPedido = async (CodigoPedido) => {
             NombreCliente: pedido.CaCliente?.NombreCliente || '',
 
             FechaEntrega: pedido.FechaEntrega,
-            Estado: pedido.CaEstadoPedido?.NombreEstadoPedido || '',
+            CodigoEstadoPedido: pedido.CodigoEstadoPedido,
+            NombreEstadoPedido: pedido.CaEstadoPedido?.NombreEstadoPedido || '',
 
             Descuento: pedido.Descuento || 0,
             Subtotal: pedido.Subtotal || 0,
@@ -416,12 +528,6 @@ const ObtenerPedido = async (CodigoPedido) => {
 
             Productos: productos
         };
-
-
-        console.log(
-            '📦 RESPUESTA COMPLETA DEL PEDIDO:',
-            JSON.stringify(respuesta, null, 2)
-        );
 
         return respuesta;
 
@@ -457,7 +563,7 @@ const CrearPedido = async (datos, usuario) => {
         const pedido = await PedidoModelo.create({
             CodigoEmpresa: 1,
             CodigoCliente: datos.CodigoCliente,
-            CodigoEstadoPedido: 1,
+            CodigoEstadoPedido: datos.CodigoEstadoPedido || 1,
             CodigoUsuario: usuario,
 
             FechaCreacion: new Date(),
@@ -546,19 +652,33 @@ const CrearPedido = async (datos, usuario) => {
         // 💰 PAGO
         if (datos.MontoPago && datos.FormaPago) {
 
+            // 🔹 Validación de monto de pago
+            const totalPedido = datos.Total; // total del pedido
+            const montoPago = datos.MontoPago;
+
+            if (montoPago < 0) {
+                LanzarError('El monto de pago no puede ser negativo', 400, 'Advertencia');
+            }
+
+            if (montoPago > totalPedido) {
+                LanzarError(`El monto de pago (${montoPago.toFixed(2)}) excede el total del pedido (${totalPedido.toFixed(2)})`, 400, 'Advertencia');
+            }
+
+            // 🔹 Crear el pago si pasa la validación
             const pago = await PagoModelo.create({
                 CodigoEmpresa: 1,
                 CodigoUsuario: usuario,
                 CodigoFormaPago: datos.FormaPago,
-                Monto: datos.MontoPago,
+                Monto: montoPago,
                 FechaPago: new Date(),
-                Estatus: 1
+                Estatus: 1,
+                NumeroComprobante: datos.Referencia || null
             }, { transaction: transaccion });
 
             await PagoAplicacionModelo.create({
                 CodigoPedido: pedido.CodigoPedido,
                 CodigoPago: pago.CodigoPago,
-                MontoAplicado: datos.MontoPago,
+                MontoAplicado: montoPago,
                 TipoDocumento: 'PEDIDO',
                 CodigoDocumento: pedido.CodigoPedido,
                 Estatus: 1
@@ -574,6 +694,91 @@ const CrearPedido = async (datos, usuario) => {
         try { await transaccion.rollback(); } catch (_) { }
 
         throw error;
+    }
+};
+
+const ListadoEntregados = async () => {
+    try {
+
+        // 1️⃣ Traer solo pedidos ENTREGADOS
+        const pedidos = await PedidoModelo.findAll({
+            where: {
+                Estatus: { [Op.in]: [1, 2, 3, 4] }
+            },
+            attributes: [
+                'CodigoPedido',
+                'FechaCreacion',
+                'FechaEntrega',
+                'Subtotal',
+                'Descuento',
+                'Total'
+            ],
+            include: [
+                {
+                    model: ClienteModelo,
+                    as: 'CaCliente',
+                    attributes: ['NombreCliente']
+                },
+                {
+                    model: EstadoPedidoModelo,
+                    as: 'CaEstadoPedido',
+                    attributes: ['CodigoEstadoPedido', 'NombreEstadoPedido'],
+                    where: {
+                        NombreEstadoPedido: 'ENTREGADO'
+                    }
+                },
+                {
+                    model: UsuarioModelo,
+                    as: 'AdUsuario',
+                    attributes: ['NombreUsuario']
+                }
+            ],
+            order: [['FechaCreacion', 'DESC']]
+        });
+
+        // 2️⃣ Calcular pagos
+        const resultado = [];
+
+        for (const p of pedidos) {
+
+            const Total = Number(p.Total || 0);
+
+            const pagos = await PagoAplicacionModelo.findAll({
+                where: {
+                    TipoDocumento: 'PEDIDO',
+                    CodigoDocumento: p.CodigoPedido
+                },
+                attributes: ['MontoAplicado']
+            });
+
+            const TotalPagado = pagos.reduce(
+                (sum, pago) => sum + Number(pago.MontoAplicado),
+                0
+            );
+
+            const SaldoPendiente = Total - TotalPagado;
+
+            resultado.push({
+                CodigoPedido: p.CodigoPedido,
+                NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
+                FechaCreacion: p.FechaCreacion,
+                FechaEntrega: p.FechaEntrega,
+                Subtotal: p.Subtotal,
+                Descuento: p.Descuento,
+                Total: Total,
+                NombreEstatus: p.CaEstadoPedido?.NombreEstadoPedido || 'Sin estado',
+                Estatus: p.CaEstadoPedido?.CodigoEstadoPedido || 0,
+                Usuario: p.AdUsuario?.NombreUsuario || 'Sin usuario',
+                TotalPagado: TotalPagado,
+                SaldoPendiente: SaldoPendiente < 0 ? 0 : SaldoPendiente
+            });
+        }
+
+        return resultado;
+
+    } catch (error) {
+        console.error(error);
+        LanzarError('Error al obtener pedidos entregados', 500, 'Error');
     }
 };
 
@@ -637,6 +842,7 @@ const ActualizarPedido = async (datos, usuario) => {
         await pedido.update({
 
             CodigoCliente: datos.CodigoCliente,
+            CodigoEstadoPedido: datos.CodigoEstadoPedido,
             FechaEntrega: datos.FechaEntrega,
 
             Subtotal: datos.Subtotal,
@@ -748,10 +954,11 @@ const ActualizarPedido = async (datos, usuario) => {
 
 const Listado = async () => {
     try {
-        // 1️⃣ Traer todos los pedidos activos
+
+        // 1️⃣ Traer pedidos activos EXCEPTO ENTREGADO
         const pedidos = await PedidoModelo.findAll({
             where: {
-                Estatus: { [Op.in]: [1, 2, 3, 4] } // pedidos activos/validos
+                Estatus: { [Op.in]: [1, 2, 3, 4] }
             },
             attributes: [
                 'CodigoPedido',
@@ -770,7 +977,12 @@ const Listado = async () => {
                 {
                     model: EstadoPedidoModelo,
                     as: 'CaEstadoPedido',
-                    attributes: ['CodigoEstadoPedido', 'NombreEstadoPedido']
+                    attributes: ['CodigoEstadoPedido', 'NombreEstadoPedido'],
+                    where: {
+                        NombreEstadoPedido: {
+                            [Op.ne]: 'ENTREGADO'
+                        }
+                    }
                 },
                 {
                     model: UsuarioModelo,
@@ -781,12 +993,13 @@ const Listado = async () => {
             order: [['FechaCreacion', 'DESC']]
         });
 
-        // 2️⃣ Mapear y calcular saldo pendiente real
+        // 2️⃣ Mapear y calcular saldo pendiente
         const resultado = [];
+
         for (const p of pedidos) {
+
             const Total = Number(p.Total || 0);
 
-            // 🔎 Obtener todos los pagos aplicados a este pedido
             const pagos = await PagoAplicacionModelo.findAll({
                 where: {
                     TipoDocumento: 'PEDIDO',
@@ -795,7 +1008,11 @@ const Listado = async () => {
                 attributes: ['MontoAplicado']
             });
 
-            const TotalPagado = pagos.reduce((sum, pago) => sum + Number(pago.MontoAplicado), 0);
+            const TotalPagado = pagos.reduce(
+                (sum, pago) => sum + Number(pago.MontoAplicado),
+                0
+            );
+
             const SaldoPendiente = Total - TotalPagado;
 
             resultado.push({
@@ -810,7 +1027,7 @@ const Listado = async () => {
                 Estatus: p.CaEstadoPedido?.CodigoEstadoPedido || 0,
                 Usuario: p.AdUsuario?.NombreUsuario || 'Sin usuario',
                 TotalPagado: TotalPagado,
-                SaldoPendiente: SaldoPendiente < 0 ? 0 : SaldoPendiente // nunca negativo
+                SaldoPendiente: SaldoPendiente < 0 ? 0 : SaldoPendiente
             });
         }
 
@@ -1097,7 +1314,38 @@ const ListadoTipoCuello = async () => {
     }
 
 };
+const ListadoEstadoPedido = async () => {
 
+    try {
+
+        const estadosPedido = await EstadoPedido.findAll({
+
+            where: {
+                Estatus: 1
+            },
+
+            attributes: [
+                'CodigoEstadoPedido',
+                'NombreEstadoPedido'
+            ],
+
+            order: [['NombreEstadoPedido', 'ASC']]
+
+        });
+
+        return estadosPedido.map(e => ({
+            CodigoEstadoPedido: e.CodigoEstadoPedido,
+            NombreEstadoPedido: e.NombreEstadoPedido
+        }));
+
+    } catch (error) {
+
+        console.error('ERROR ListadoEstadoPedido:', error);
+        throw error;
+
+    }
+
+};
 const ObtenerProducto = async (codigoProducto) => {
     try {
         const producto = await Producto.findOne({
@@ -1181,5 +1429,6 @@ const ListadoFormaPago = async () => {
 module.exports = {
     Listado, Obtener, ListadoTipoProducto, ListadoTipoTela,
     ListadoTela, ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido, ListadoTipoCuello,
-    ObtenerPedido, ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido
+    ObtenerPedido, ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido, 
+    EliminarPedido, ListadoEstadoPedido, ListadoEntregados
 };

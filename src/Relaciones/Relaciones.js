@@ -18,6 +18,10 @@ const PagoModelo = require(Path.join(RutaModelos, 'Pago.js'))(BaseDatos, Sequeli
 const PagoAplicacionModelo = require(Path.join(RutaModelos, 'PagoAplicacion.js'))(BaseDatos, Sequelize.DataTypes);
 const PedidoDetalleMedidaModelo = require(Path.join(RutaModelos, 'PedidoDetalleMedida.js'))(BaseDatos, Sequelize.DataTypes);
 const TipoMedidaModelo = require(Path.join(RutaModelos, 'TipoMedida.js'))(BaseDatos, Sequelize.DataTypes);
+const MarcaModelo = require(Path.join(RutaModelos, 'Marca.js'))(BaseDatos, Sequelize.DataTypes);
+const EstiloModelo = require(Path.join(RutaModelos, 'Estilo.js'))(BaseDatos, Sequelize.DataTypes);
+const TallaModelo = require(Path.join(RutaModelos, 'Talla.js'))(BaseDatos, Sequelize.DataTypes);
+const ColorModelo = require(Path.join(RutaModelos, 'Color.js'))(BaseDatos, Sequelize.DataTypes);
 
 // Modelos que fallaban
 const ProductoModelo = require(Path.join(RutaModelos, 'Producto.js'))(BaseDatos, Sequelize.DataTypes);
@@ -71,6 +75,52 @@ TipoMedidaModelo.hasMany(PedidoDetalleMedidaModelo, { foreignKey: 'CodigoTipoMed
 // ===================== PRODUCTO - INVENTARIO =====================
 ProductoModelo.hasMany(InventarioModelo, { foreignKey: 'CodigoProducto', as: 'Inventarios' });
 InventarioModelo.belongsTo(ProductoModelo, { foreignKey: 'CodigoProducto', as: 'Producto' });
+// ===================== INVENTARIO - MARCA =====================
+InventarioModelo.belongsTo(MarcaModelo, {
+  foreignKey: 'CodigoMarca',
+  as: 'Marca'
+});
+
+MarcaModelo.hasMany(InventarioModelo, {
+  foreignKey: 'CodigoMarca',
+  as: 'Inventarios'
+});
+
+
+// ===================== INVENTARIO - ESTILO =====================
+InventarioModelo.belongsTo(EstiloModelo, {
+  foreignKey: 'CodigoEstilo',
+  as: 'Estilo'
+});
+
+EstiloModelo.hasMany(InventarioModelo, {
+  foreignKey: 'CodigoEstilo',
+  as: 'Inventarios'
+});
+
+
+// ===================== INVENTARIO - TALLA =====================
+InventarioModelo.belongsTo(TallaModelo, {
+  foreignKey: 'CodigoTalla',
+  as: 'Talla'
+});
+
+TallaModelo.hasMany(InventarioModelo, {
+  foreignKey: 'CodigoTalla',
+  as: 'Inventarios'
+});
+
+
+// ===================== INVENTARIO - COLOR =====================
+InventarioModelo.belongsTo(ColorModelo, {
+  foreignKey: 'CodigoColor',
+  as: 'Color'
+});
+
+ColorModelo.hasMany(InventarioModelo, {
+  foreignKey: 'CodigoColor',
+  as: 'Inventarios'
+});
 
 // ===================== PEDIDO DETALLE - TELA =====================
 
@@ -121,5 +171,9 @@ module.exports = {
   PedidoDetalleModelo,
   TipoProductoModelo,
   TipoTelaModelo,
-  TelaModelo
+  TelaModelo,
+  MarcaModelo,
+  EstiloModelo,
+  TallaModelo,
+  ColorModelo,
 };

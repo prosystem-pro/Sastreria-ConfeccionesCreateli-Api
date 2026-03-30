@@ -126,7 +126,6 @@ const SubirImagen = async (req, res) => {
   } catch (error) {
     if (UrlPublica) {
       try {
-        console.log("Intentando eliminar imagen nueva tras error:", UrlPublica);
         await EliminarImagen(UrlPublica);
       } catch (errEliminar) {
         console.error("Error eliminando imagen subida tras fallo:", errEliminar.message);

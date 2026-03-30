@@ -15,6 +15,8 @@ const Login = require("./Rutas/LoginRuta");
 //GENERAL
 const ClienteRuta = require("./Rutas/ClienteRuta");
 const HistorialPedidoRuta = require("./Rutas/HistorialPedidoRuta");
+const InventarioRuta = require("./Rutas/InventarioRuta");
+const VentaRuta = require("./Rutas/VentaRuta");
 
 const Ruter = 'api';
 const CuerpoJson = require('./FuncionIntermedia/CuerpoJson');
@@ -41,5 +43,7 @@ App.use(`/${Ruter}`, RecursoRuta);
 //GENERAL
 App.use(`/${Ruter}`, ClienteRuta);
 App.use(`/${Ruter}`, HistorialPedidoRuta);
+App.use(`/${Ruter}`, InventarioRuta);
+App.use(`/${Ruter}`, VentaRuta);
 
 module.exports = App;
