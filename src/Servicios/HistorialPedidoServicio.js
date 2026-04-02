@@ -4,7 +4,7 @@ const BaseDatos = require('../BaseDatos/ConexionBaseDatos');
 const { PedidoModelo, ClienteModelo, EstadoPedidoModelo, UsuarioModelo,
     ProductoModelo, PedidoDetalleModelo, InventarioModelo, PedidoDetalleMedidaModelo,
     TipoProductoModelo, TipoMedidaModelo, PagoModelo, PagoAplicacionModelo, TipoTelaModelo,
-    TelaModelo } = require('../Relaciones/Relaciones');
+    TelaModelo, MovimientoInventarioModelo  } = require('../Relaciones/Relaciones');
 
 const TipoProducto = require('../Modelos/TipoProducto')(BaseDatos, Sequelize.DataTypes);
 const TipoTela = require('../Modelos/TipoTela')(BaseDatos, Sequelize.DataTypes);
@@ -19,6 +19,327 @@ const TipoMedida = require('../Modelos/TipoMedida')(BaseDatos, Sequelize.DataTyp
 const FormaPago = require('../Modelos/FormaPago')(BaseDatos, Sequelize.DataTypes);
 const { LanzarError } = require('../Utilidades/ErrorServicios');
 const { Op } = require('sequelize');
+const CrearPedido = async (datos, usuario) => {
+    const transaccion = await BaseDatos.transaction();
+
+    try {
+
+        if (!datos.CodigoCliente)
+            LanzarError('El cliente es obligatorio', 400, 'Advertencia');
+
+        if (!datos.Productos || datos.Productos.length === 0)
+            LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
+
+        const pedido = await PedidoModelo.create({
+            CodigoEmpresa: 1,
+            CodigoCliente: datos.CodigoCliente,
+            CodigoEstadoPedido: datos.CodigoEstadoPedido || 1,
+            CodigoUsuario: usuario,
+
+            FechaCreacion: new Date(),
+            FechaEntrega: datos.FechaEntrega,
+
+            Subtotal: datos.Subtotal,
+            Descuento: datos.Descuento,
+            Total: datos.Total,
+
+            Estatus: 1
+        }, { transaction: transaccion });
+
+        for (const producto of datos.Productos) {
+
+            const inventario = await InventarioModelo.findOne({
+                where: {
+                    CodigoProducto: producto.CodigoProducto,
+                    Estatus: 1
+                },
+                transaction: transaccion,
+                lock: true
+            });
+
+            if (!inventario)
+                LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400, 'Advertencia');
+
+            if (inventario.StockActual < producto.Cantidad)
+                LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400, 'Advertencia');
+
+            const stockAnterior = inventario.StockActual;
+            const stockNuevo = stockAnterior - producto.Cantidad;
+
+            const detalle = await PedidoDetalleModelo.create({
+                CodigoPedido: pedido.CodigoPedido,
+                CodigoInventario: inventario.CodigoInventario,
+
+                CodigoTipoTela: producto.CodigoTipoTela || null,
+                CodigoTela: producto.CodigoTela || null,
+
+                Codigo: producto.Codigo || null,
+                Color: producto.Color || null,
+                Referencia: producto.Referencia || null,
+
+                Cantidad: producto.Cantidad,
+                PrecioVenta: producto.Precio,
+                Subtotal: producto.Subtotal,
+
+                Estatus: 1
+            }, { transaction: transaccion });
+
+            // ================= MEDIDAS =================
+            if (producto.Medidas) {
+
+                const medidas = producto.Medidas;
+
+                for (const key in medidas) {
+
+                    const valor = medidas[key];
+
+                    if (valor === null || valor === undefined || valor === '')
+                        continue;
+
+                    const tipoMedida = await TipoMedidaModelo.findOne({
+                        where: { NombreTipoMedida: key },
+                        transaction: transaccion
+                    });
+
+                    if (!tipoMedida) continue;
+
+                    const esNumero = typeof valor === 'number';
+
+                    await PedidoDetalleMedidaModelo.create({
+                        CodigoPedidoDetalle: detalle.CodigoPedidoDetalle,
+                        CodigoTipoMedida: tipoMedida.CodigoTipoMedida,
+                        Valor: esNumero ? valor : null,
+                        Descripcion: !esNumero ? String(valor) : null
+                    }, { transaction: transaccion });
+                }
+            }
+
+            // ================= ACTUALIZAR INVENTARIO =================
+            await inventario.update({
+                StockActual: stockNuevo
+            }, { transaction: transaccion });
+
+            // ================= MOVIMIENTO INVENTARIO =================
+            await MovimientoInventarioModelo.create({
+
+                CodigoEmpresa: 1,
+                CodigoInventario: inventario.CodigoInventario,
+                CodigoUsuario: usuario,
+
+                TipoMovimiento: 'SALIDA',
+                OrigenMovimiento: 'PEDIDO',
+
+                TipoDocumento: 'PEDIDO',
+                CodigoDocumento: pedido.CodigoPedido,
+
+                Cantidad: producto.Cantidad,
+
+                StockAnterior: stockAnterior,
+                StockNuevo: stockNuevo,
+
+                FechaMovimiento: new Date(),
+                Observacion: `Salida por pedido ${pedido.CodigoPedido}`,
+
+                Estatus: 1,
+                FechaCreacion: new Date()
+
+            }, { transaction: transaccion });
+        }
+
+        // ================= PAGO =================
+        if (datos.MontoPago && datos.FormaPago) {
+
+            const totalPedido = datos.Total;
+            const montoPago = datos.MontoPago;
+
+            if (montoPago < 0)
+                LanzarError('El monto de pago no puede ser negativo', 400, 'Advertencia');
+
+            if (montoPago > totalPedido)
+                LanzarError(
+                    `El monto de pago (${montoPago.toFixed(2)}) excede el total del pedido (${totalPedido.toFixed(2)})`,
+                    400,
+                    'Advertencia'
+                );
+
+            const pago = await PagoModelo.create({
+                CodigoEmpresa: 1,
+                CodigoUsuario: usuario,
+                CodigoFormaPago: datos.FormaPago,
+                Monto: montoPago,
+                FechaPago: new Date(),
+                Estatus: 1,
+                NumeroComprobante: datos.Referencia || null
+            }, { transaction: transaccion });
+
+            await PagoAplicacionModelo.create({
+                CodigoPedido: pedido.CodigoPedido,
+                CodigoPago: pago.CodigoPago,
+                MontoAplicado: montoPago,
+                TipoDocumento: 'PEDIDO',
+                CodigoDocumento: pedido.CodigoPedido,
+                Estatus: 1
+            }, { transaction: transaccion });
+        }
+
+        await transaccion.commit();
+
+        return { CodigoPedido: pedido.CodigoPedido };
+
+    } catch (error) {
+
+        try { await transaccion.rollback(); } catch (_) { }
+
+        throw error;
+    }
+};
+// const CrearPedido = async (datos, usuario) => {
+//     const transaccion = await BaseDatos.transaction();
+
+//     try {
+
+//         if (!datos.CodigoCliente)
+//             LanzarError('El cliente es obligatorio', 400, 'Advertencia');
+
+//         if (!datos.Productos || datos.Productos.length === 0)
+//             LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
+
+//         const pedido = await PedidoModelo.create({
+//             CodigoEmpresa: 1,
+//             CodigoCliente: datos.CodigoCliente,
+//             CodigoEstadoPedido: datos.CodigoEstadoPedido || 1,
+//             CodigoUsuario: usuario,
+
+//             FechaCreacion: new Date(),
+//             FechaEntrega: datos.FechaEntrega,
+
+//             Subtotal: datos.Subtotal,
+//             Descuento: datos.Descuento,
+//             Total: datos.Total,
+
+//             Estatus: 1
+//         }, { transaction: transaccion });
+
+//         for (const producto of datos.Productos) {
+
+//             const inventario = await InventarioModelo.findOne({
+//                 where: {
+//                     CodigoProducto: producto.CodigoProducto,
+//                     Estatus: 1
+//                 },
+//                 transaction: transaccion
+//             });
+
+//             if (!inventario)
+//                 LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400, 'Advertencia');
+
+//             if (inventario.StockActual < producto.Cantidad)
+//                 LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400, 'Advertencia');
+
+//             // 🔥 YA NO GUARDAMOS SELECTS COMO FK
+//             const detalle = await PedidoDetalleModelo.create({
+//                 CodigoPedido: pedido.CodigoPedido,
+//                 CodigoInventario: inventario.CodigoInventario,
+
+//                 CodigoTipoTela: producto.CodigoTipoTela || null,
+//                 CodigoTela: producto.CodigoTela || null,
+
+//                 Codigo: producto.Codigo || null,
+//                 Color: producto.Color || null,
+//                 Referencia: producto.Referencia || null,
+
+//                 Cantidad: producto.Cantidad,
+//                 PrecioVenta: producto.Precio,
+//                 Subtotal: producto.Subtotal,
+
+//                 Estatus: 1
+//             }, { transaction: transaccion });
+
+//             // 📏 GUARDAR TODAS LAS MEDIDAS (NUM + STRING)
+//             if (producto.Medidas) {
+
+//                 const medidas = producto.Medidas;
+
+//                 for (const key in medidas) {
+
+//                     const valor = medidas[key];
+
+//                     if (valor === null || valor === undefined || valor === '')
+//                         continue;
+
+//                     const tipoMedida = await TipoMedidaModelo.findOne({
+//                         where: { NombreTipoMedida: key },
+//                         transaction: transaccion
+//                     });
+
+//                     if (!tipoMedida) continue;
+
+//                     const esNumero = typeof valor === 'number';
+
+//                     await PedidoDetalleMedidaModelo.create({
+//                         CodigoPedidoDetalle: detalle.CodigoPedidoDetalle,
+//                         CodigoTipoMedida: tipoMedida.CodigoTipoMedida,
+
+//                         // 🔥 CLAVE
+//                         Valor: esNumero ? valor : null,
+//                         Descripcion: !esNumero ? String(valor) : null
+
+//                     }, { transaction: transaccion });
+//                 }
+//             }
+
+//             await inventario.update({
+//                 StockActual: inventario.StockActual - producto.Cantidad
+//             }, { transaction: transaccion });
+//         }
+
+//         // 💰 PAGO
+//         if (datos.MontoPago && datos.FormaPago) {
+
+//             // 🔹 Validación de monto de pago
+//             const totalPedido = datos.Total; // total del pedido
+//             const montoPago = datos.MontoPago;
+
+//             if (montoPago < 0) {
+//                 LanzarError('El monto de pago no puede ser negativo', 400, 'Advertencia');
+//             }
+
+//             if (montoPago > totalPedido) {
+//                 LanzarError(`El monto de pago (${montoPago.toFixed(2)}) excede el total del pedido (${totalPedido.toFixed(2)})`, 400, 'Advertencia');
+//             }
+
+//             // 🔹 Crear el pago si pasa la validación
+//             const pago = await PagoModelo.create({
+//                 CodigoEmpresa: 1,
+//                 CodigoUsuario: usuario,
+//                 CodigoFormaPago: datos.FormaPago,
+//                 Monto: montoPago,
+//                 FechaPago: new Date(),
+//                 Estatus: 1,
+//                 NumeroComprobante: datos.Referencia || null
+//             }, { transaction: transaccion });
+
+//             await PagoAplicacionModelo.create({
+//                 CodigoPedido: pedido.CodigoPedido,
+//                 CodigoPago: pago.CodigoPago,
+//                 MontoAplicado: montoPago,
+//                 TipoDocumento: 'PEDIDO',
+//                 CodigoDocumento: pedido.CodigoPedido,
+//                 Estatus: 1
+//             }, { transaction: transaccion });
+//         }
+
+//         await transaccion.commit();
+
+//         return { CodigoPedido: pedido.CodigoPedido };
+
+//     } catch (error) {
+
+//         try { await transaccion.rollback(); } catch (_) { }
+
+//         throw error;
+//     }
+// };
 
 const EliminarPedido = async (CodigoPedido) => {
 
@@ -29,7 +350,6 @@ const EliminarPedido = async (CodigoPedido) => {
         if (!CodigoPedido)
             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
 
-        // ===================== PEDIDO =====================
         const pedido = await PedidoModelo.findOne({
             where: { CodigoPedido },
             transaction: transaccion
@@ -38,8 +358,6 @@ const EliminarPedido = async (CodigoPedido) => {
         if (!pedido)
             LanzarError('El pedido no existe', 404, 'Advertencia');
 
-
-        // ===================== DETALLES =====================
         const detalles = await PedidoDetalleModelo.findAll({
             where: { CodigoPedido },
             transaction: transaccion
@@ -47,23 +365,50 @@ const EliminarPedido = async (CodigoPedido) => {
 
         for (const detalle of detalles) {
 
-            // 🔄 Restaurar inventario
             const inventario = await InventarioModelo.findOne({
                 where: {
                     CodigoInventario: detalle.CodigoInventario
                 },
-                transaction: transaccion
+                transaction: transaccion,
+                lock: true
             });
 
             if (inventario) {
 
+                const stockAnterior = inventario.StockActual;
+                const stockNuevo = stockAnterior + detalle.Cantidad;
+
                 await inventario.update({
-                    StockActual: inventario.StockActual + detalle.Cantidad
+                    StockActual: stockNuevo
                 }, { transaction: transaccion });
 
+                // ================= MOVIMIENTO INVENTARIO =================
+                await MovimientoInventarioModelo.create({
+
+                    CodigoEmpresa: 1,
+                    CodigoInventario: inventario.CodigoInventario,
+                    CodigoUsuario: pedido.CodigoUsuario,
+
+                    TipoMovimiento: 'ENTRADA',
+                    OrigenMovimiento: 'ELIMINACION_PEDIDO',
+
+                    TipoDocumento: 'PEDIDO',
+                    CodigoDocumento: CodigoPedido,
+
+                    Cantidad: detalle.Cantidad,
+
+                    StockAnterior: stockAnterior,
+                    StockNuevo: stockNuevo,
+
+                    FechaMovimiento: new Date(),
+                    Observacion: `Entrada por eliminación pedido ${CodigoPedido}`,
+
+                    Estatus: 1,
+                    FechaCreacion: new Date()
+
+                }, { transaction: transaccion });
             }
 
-            // 🗑️ Eliminar medidas
             await PedidoDetalleMedidaModelo.destroy({
                 where: {
                     CodigoPedidoDetalle: detalle.CodigoPedidoDetalle
@@ -71,14 +416,12 @@ const EliminarPedido = async (CodigoPedido) => {
                 transaction: transaccion
             });
 
-            // 🗑️ Eliminar detalle
             await detalle.destroy({
                 transaction: transaccion
             });
         }
 
-
-        // ===================== PAGOS =====================
+        // ================= PAGOS =================
         const pagosAplicados = await PagoAplicacionModelo.findAll({
             where: {
                 TipoDocumento: 'PEDIDO',
@@ -89,12 +432,10 @@ const EliminarPedido = async (CodigoPedido) => {
 
         for (const pagoAplicacion of pagosAplicados) {
 
-            // 🗑️ Eliminar PagoAplicacion
             await pagoAplicacion.destroy({
                 transaction: transaccion
             });
 
-            // 🗑️ Eliminar Pago
             await PagoModelo.destroy({
                 where: {
                     CodigoPago: pagoAplicacion.CodigoPago
@@ -103,12 +444,9 @@ const EliminarPedido = async (CodigoPedido) => {
             });
         }
 
-
-        // ===================== PEDIDO =====================
         await pedido.destroy({
             transaction: transaccion
         });
-
 
         await transaccion.commit();
 
@@ -129,6 +467,115 @@ const EliminarPedido = async (CodigoPedido) => {
         throw error;
     }
 };
+// const EliminarPedido = async (CodigoPedido) => {
+
+//     const transaccion = await BaseDatos.transaction();
+
+//     try {
+
+//         if (!CodigoPedido)
+//             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+
+//         // ===================== PEDIDO =====================
+//         const pedido = await PedidoModelo.findOne({
+//             where: { CodigoPedido },
+//             transaction: transaccion
+//         });
+
+//         if (!pedido)
+//             LanzarError('El pedido no existe', 404, 'Advertencia');
+
+
+//         // ===================== DETALLES =====================
+//         const detalles = await PedidoDetalleModelo.findAll({
+//             where: { CodigoPedido },
+//             transaction: transaccion
+//         });
+
+//         for (const detalle of detalles) {
+
+//             // 🔄 Restaurar inventario
+//             const inventario = await InventarioModelo.findOne({
+//                 where: {
+//                     CodigoInventario: detalle.CodigoInventario
+//                 },
+//                 transaction: transaccion
+//             });
+
+//             if (inventario) {
+
+//                 await inventario.update({
+//                     StockActual: inventario.StockActual + detalle.Cantidad
+//                 }, { transaction: transaccion });
+
+//             }
+
+//             // 🗑️ Eliminar medidas
+//             await PedidoDetalleMedidaModelo.destroy({
+//                 where: {
+//                     CodigoPedidoDetalle: detalle.CodigoPedidoDetalle
+//                 },
+//                 transaction: transaccion
+//             });
+
+//             // 🗑️ Eliminar detalle
+//             await detalle.destroy({
+//                 transaction: transaccion
+//             });
+//         }
+
+
+//         // ===================== PAGOS =====================
+//         const pagosAplicados = await PagoAplicacionModelo.findAll({
+//             where: {
+//                 TipoDocumento: 'PEDIDO',
+//                 CodigoDocumento: CodigoPedido
+//             },
+//             transaction: transaccion
+//         });
+
+//         for (const pagoAplicacion of pagosAplicados) {
+
+//             // 🗑️ Eliminar PagoAplicacion
+//             await pagoAplicacion.destroy({
+//                 transaction: transaccion
+//             });
+
+//             // 🗑️ Eliminar Pago
+//             await PagoModelo.destroy({
+//                 where: {
+//                     CodigoPago: pagoAplicacion.CodigoPago
+//                 },
+//                 transaction: transaccion
+//             });
+//         }
+
+
+//         // ===================== PEDIDO =====================
+//         await pedido.destroy({
+//             transaction: transaccion
+//         });
+
+
+//         await transaccion.commit();
+
+//         return {
+//             CodigoPedido,
+//             TotalDetalles: detalles.length,
+//             TotalPagos: pagosAplicados.length,
+//             Mensaje: 'Pedido eliminado completamente'
+//         };
+
+//     } catch (error) {
+
+//         try {
+//             await transaccion.rollback();
+//         } catch (_) { }
+
+//         console.error(error);
+//         throw error;
+//     }
+// };
 
 const ListarPagosPorPedido = async (codigoPedido) => {
 
@@ -549,153 +996,7 @@ const ObtenerPedido = async (CodigoPedido) => {
     }
 };
 
-const CrearPedido = async (datos, usuario) => {
-    const transaccion = await BaseDatos.transaction();
 
-    try {
-
-        if (!datos.CodigoCliente)
-            LanzarError('El cliente es obligatorio', 400, 'Advertencia');
-
-        if (!datos.Productos || datos.Productos.length === 0)
-            LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
-
-        const pedido = await PedidoModelo.create({
-            CodigoEmpresa: 1,
-            CodigoCliente: datos.CodigoCliente,
-            CodigoEstadoPedido: datos.CodigoEstadoPedido || 1,
-            CodigoUsuario: usuario,
-
-            FechaCreacion: new Date(),
-            FechaEntrega: datos.FechaEntrega,
-
-            Subtotal: datos.Subtotal,
-            Descuento: datos.Descuento,
-            Total: datos.Total,
-
-            Estatus: 1
-        }, { transaction: transaccion });
-
-        for (const producto of datos.Productos) {
-
-            const inventario = await InventarioModelo.findOne({
-                where: {
-                    CodigoProducto: producto.CodigoProducto,
-                    Estatus: 1
-                },
-                transaction: transaccion
-            });
-
-            if (!inventario)
-                LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400, 'Advertencia');
-
-            if (inventario.StockActual < producto.Cantidad)
-                LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400, 'Advertencia');
-
-            // 🔥 YA NO GUARDAMOS SELECTS COMO FK
-            const detalle = await PedidoDetalleModelo.create({
-                CodigoPedido: pedido.CodigoPedido,
-                CodigoInventario: inventario.CodigoInventario,
-
-                CodigoTipoTela: producto.CodigoTipoTela || null,
-                CodigoTela: producto.CodigoTela || null,
-
-                Codigo: producto.Codigo || null,
-                Color: producto.Color || null,
-                Referencia: producto.Referencia || null,
-
-                Cantidad: producto.Cantidad,
-                PrecioVenta: producto.Precio,
-                Subtotal: producto.Subtotal,
-
-                Estatus: 1
-            }, { transaction: transaccion });
-
-            // 📏 GUARDAR TODAS LAS MEDIDAS (NUM + STRING)
-            if (producto.Medidas) {
-
-                const medidas = producto.Medidas;
-
-                for (const key in medidas) {
-
-                    const valor = medidas[key];
-
-                    if (valor === null || valor === undefined || valor === '')
-                        continue;
-
-                    const tipoMedida = await TipoMedidaModelo.findOne({
-                        where: { NombreTipoMedida: key },
-                        transaction: transaccion
-                    });
-
-                    if (!tipoMedida) continue;
-
-                    const esNumero = typeof valor === 'number';
-
-                    await PedidoDetalleMedidaModelo.create({
-                        CodigoPedidoDetalle: detalle.CodigoPedidoDetalle,
-                        CodigoTipoMedida: tipoMedida.CodigoTipoMedida,
-
-                        // 🔥 CLAVE
-                        Valor: esNumero ? valor : null,
-                        Descripcion: !esNumero ? String(valor) : null
-
-                    }, { transaction: transaccion });
-                }
-            }
-
-            await inventario.update({
-                StockActual: inventario.StockActual - producto.Cantidad
-            }, { transaction: transaccion });
-        }
-
-        // 💰 PAGO
-        if (datos.MontoPago && datos.FormaPago) {
-
-            // 🔹 Validación de monto de pago
-            const totalPedido = datos.Total; // total del pedido
-            const montoPago = datos.MontoPago;
-
-            if (montoPago < 0) {
-                LanzarError('El monto de pago no puede ser negativo', 400, 'Advertencia');
-            }
-
-            if (montoPago > totalPedido) {
-                LanzarError(`El monto de pago (${montoPago.toFixed(2)}) excede el total del pedido (${totalPedido.toFixed(2)})`, 400, 'Advertencia');
-            }
-
-            // 🔹 Crear el pago si pasa la validación
-            const pago = await PagoModelo.create({
-                CodigoEmpresa: 1,
-                CodigoUsuario: usuario,
-                CodigoFormaPago: datos.FormaPago,
-                Monto: montoPago,
-                FechaPago: new Date(),
-                Estatus: 1,
-                NumeroComprobante: datos.Referencia || null
-            }, { transaction: transaccion });
-
-            await PagoAplicacionModelo.create({
-                CodigoPedido: pedido.CodigoPedido,
-                CodigoPago: pago.CodigoPago,
-                MontoAplicado: montoPago,
-                TipoDocumento: 'PEDIDO',
-                CodigoDocumento: pedido.CodigoPedido,
-                Estatus: 1
-            }, { transaction: transaccion });
-        }
-
-        await transaccion.commit();
-
-        return { CodigoPedido: pedido.CodigoPedido };
-
-    } catch (error) {
-
-        try { await transaccion.rollback(); } catch (_) { }
-
-        throw error;
-    }
-};
 
 const ListadoEntregados = async () => {
     try {
@@ -980,7 +1281,7 @@ const Listado = async () => {
                     attributes: ['CodigoEstadoPedido', 'NombreEstadoPedido'],
                     where: {
                         NombreEstadoPedido: {
-                            [Op.ne]: 'ENTREGADO'
+                            [Op.notIn]: ['ENTREGADO', 'VENDIDO']
                         }
                     }
                 },
@@ -1429,6 +1730,6 @@ const ListadoFormaPago = async () => {
 module.exports = {
     Listado, Obtener, ListadoTipoProducto, ListadoTipoTela,
     ListadoTela, ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido, ListadoTipoCuello,
-    ObtenerPedido, ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido, 
+    ObtenerPedido, ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido,
     EliminarPedido, ListadoEstadoPedido, ListadoEntregados
 };

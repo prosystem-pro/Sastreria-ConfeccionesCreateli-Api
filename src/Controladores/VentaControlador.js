@@ -29,7 +29,99 @@ const ListadoProducto = async (req, res) => {
 
 };
 
+// =============================
+// CREAR VENTA
+// =============================
+const CrearVenta = async (req, res) => {
+
+    try {
+
+        const datos = req.body;
+
+        const DatosUsuario = req.Datos;   // 🔴 obtener usuario desde token
+
+        const resultado = await Servicio.CrearVenta(
+            datos,
+            DatosUsuario
+        );
+
+        return ResponderExito(
+            res,
+            'Venta creada correctamente',
+            resultado
+        );
+
+    } catch (error) {
+
+        return ManejarError(
+            error,
+            res,
+            'Error al crear venta'
+        );
+
+    }
+
+};
+
+// =============================
+// LISTADO DE VENTAS
+// =============================
+const ListadoVentas = async (req, res) => {
+    try {
+
+        const ventas = await Servicio.ListadoVentas();
+
+        return ResponderExito(
+            res,
+            'Listado de ventas obtenido correctamente.',
+            ventas || []
+        );
+
+    } catch (error) {
+
+        return ManejarError(
+            error,
+            res,
+            'Error al obtener listado de ventas'
+        );
+
+    }
+};
+
+// =============================
+// ELIMINAR VENTA
+// =============================
+const EliminarVenta = async (req, res) => {
+
+    try {
+
+        const { CodigoPedido } = req.params;
+
+        const DatosUsuario = req.Datos;
+
+        const resultado = await Servicio.EliminarVenta(
+            CodigoPedido,
+            DatosUsuario
+        );
+
+        return ResponderExito(
+            res,
+            'Venta eliminada correctamente',
+            resultado
+        );
+
+    } catch (error) {
+
+        return ManejarError(
+            error,
+            res,
+            'Error al eliminar venta'
+        );
+
+    }
+
+};
 
 module.exports = {
- ListadoProducto
+    ListadoProducto, CrearVenta, ListadoVentas, EliminarVenta
 };

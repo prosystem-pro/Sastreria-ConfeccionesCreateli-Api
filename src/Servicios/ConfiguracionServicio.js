@@ -4,10 +4,8 @@ const BaseDatos = require('../BaseDatos/ConexionBaseDatos');
 const InventarioModelo = require('../Modelos/Inventario')(BaseDatos, Sequelize.DataTypes);
 const ProductoModelo = require('../Modelos/Producto')(BaseDatos, Sequelize.DataTypes);
 const TipoProductoModelo = require('../Modelos/TipoProducto')(BaseDatos, Sequelize.DataTypes);
-const EstiloModelo = require('../Modelos/Estilo')(BaseDatos, Sequelize.DataTypes);
-const MarcaModelo = require('../Modelos/Marca')(BaseDatos, Sequelize.DataTypes);
-const TallaModelo = require('../Modelos/Talla')(BaseDatos, Sequelize.DataTypes);
-const ColorModelo = require('../Modelos/Color')(BaseDatos, Sequelize.DataTypes);
+const TipoTelaModelo = require('../Modelos/TipoTela')(BaseDatos, Sequelize.DataTypes);
+const TelaModelo = require('../Modelos/Tela')(BaseDatos, Sequelize.DataTypes);
 const MovimientoInventarioModelo = require('../Modelos/MovimientoInventario')(BaseDatos, Sequelize.DataTypes);
 
 const { LanzarError } = require('../Utilidades/ErrorServicios');
@@ -21,7 +19,369 @@ const {
     TallaModelo: TallaRelacion,
     ColorModelo: ColorRelacion,
     TipoProductoModelo: TipoProductoRelacion,
+    TipoTelaModelo: TipoTelaRelacion,
+    TelaModelo: TelaRelacion
 } = require('../Relaciones/Relaciones');
+// LISTADOS
+const ListadoTipoTela = async () => {
+    try {
+        const tipos = await TipoTelaModelo.findAll({
+            where: { Estatus: 1 },
+            attributes: ['CodigoTipoTela', 'NombreTipoTela'],
+            order: [['NombreTipoTela', 'ASC']]
+        });
+
+        return tipos.map(t => ({
+            CodigoTipoTela: t.CodigoTipoTela,
+            NombreTipoTela: t.NombreTipoTela
+        }));
+
+    } catch (error) {
+        console.error(error);
+        LanzarError('Error al obtener tipos de tela', 500, 'Error');
+    }
+};
+
+const ListadoNombreTela = async () => {
+    try {
+
+        // 1. Obtener telas
+        const telas = await TelaModelo.findAll({
+            where: { Estatus: 1 },
+            attributes: [
+                'CodigoTela',
+                'NombreTela',
+                'CodigoTipoTela'
+            ],
+            order: [['NombreTela', 'ASC']]
+        });
+
+        // 2. Obtener tipos de tela
+        const tiposTela = await TipoTelaModelo.findAll({
+            where: { Estatus: 1 },
+            attributes: [
+                'CodigoTipoTela',
+                'NombreTipoTela'
+            ]
+        });
+
+        // 3. Crear mapa de tipos
+        const mapaTipoTela = {};
+
+        tiposTela.forEach(t => {
+            mapaTipoTela[t.CodigoTipoTela] = t.NombreTipoTela;
+        });
+
+        // 4. Unir información
+        return telas.map(t => ({
+
+            CodigoTela: t.CodigoTela,
+
+            CodigoTipoTela: t.CodigoTipoTela,
+
+            NombreTipoTela: mapaTipoTela[t.CodigoTipoTela] || '',
+
+            NombreTela: t.NombreTela
+
+        }));
+
+    } catch (error) {
+
+        console.error(error);
+
+        LanzarError(
+            'Error al obtener nombres de tela',
+            500,
+            'Error'
+        );
+    }
+};
+// CREAR
+const CrearTipoTela = async (data) => {
+    try {
+
+        const { NombreTipoTela } = data;
+
+        if (!NombreTipoTela) {
+            LanzarError('El nombre del tipo de tela es requerido', 400, 'Validacion');
+        }
+
+        const existe = await TipoTelaModelo.findOne({
+            where: {
+                NombreTipoTela,
+                Estatus: 1
+            }
+        });
+
+        if (existe) {
+            LanzarError('El tipo de tela ya existe', 400, 'Validacion');
+        }
+
+        const nuevo = await TipoTelaModelo.create({
+            NombreTipoTela,
+            Estatus: 1
+        });
+
+        return {
+            CodigoTipoTela: nuevo.CodigoTipoTela,
+            NombreTipoTela: nuevo.NombreTipoTela
+        };
+
+    } catch (error) {
+        console.error(error);
+        LanzarError('Error al crear tipo de tela', 500, 'Error');
+    }
+};
+
+const CrearTela = async (data) => {
+    try {
+
+        const { CodigoTipoTela, NombreTela } = data;
+
+        if (!CodigoTipoTela || !NombreTela) {
+            LanzarError('Tipo de tela y nombre de tela son requeridos', 400, 'Validacion');
+        }
+
+        const tipoTela = await TipoTelaModelo.findByPk(CodigoTipoTela);
+
+        if (!tipoTela) {
+            LanzarError('El tipo de tela no existe', 400, 'Validacion');
+        }
+
+        const existe = await TelaModelo.findOne({
+            where: {
+                NombreTela,
+                Estatus: 1
+            }
+        });
+
+        if (existe) {
+            LanzarError('La tela ya existe', 400, 'Validacion');
+        }
+
+        const nueva = await TelaModelo.create({
+            CodigoTipoTela,
+            NombreTela,
+            Estatus: 1
+        });
+
+        return {
+            CodigoTela: nueva.CodigoTela,
+            CodigoTipoTela: nueva.CodigoTipoTela,
+            NombreTela: nueva.NombreTela
+        };
+
+    } catch (error) {
+        console.error(error);
+        LanzarError('Error al crear tela', 500, 'Error');
+    }
+};
+// OBTENER POR CODIGO
+const ObtenerTipoTelaPorCodigo = async (codigo) => {
+    try {
+
+        const tipo = await TipoTelaModelo.findOne({
+            where: {
+                CodigoTipoTela: codigo,
+                Estatus: 1
+            },
+            attributes: ['CodigoTipoTela', 'NombreTipoTela']
+        });
+
+        if (!tipo) {
+            LanzarError('Tipo de tela no encontrado', 404, 'Validacion');
+        }
+
+        return tipo;
+
+    } catch (error) {
+        console.error(error);
+        LanzarError('Error al obtener tipo de tela', 500, 'Error');
+    }
+};
+const ObtenerTelaPorCodigo = async (codigo) => {
+    try {
+
+        const tela = await TelaModelo.findOne({
+            where: {
+                CodigoTela: codigo,
+                Estatus: 1
+            },
+            attributes: [
+                'CodigoTela',
+                'CodigoTipoTela',
+                'NombreTela'
+            ],
+            include: [
+                {
+                    model: TipoTelaModelo,
+                    attributes: ['CodigoTipoTela', 'NombreTipoTela']
+                }
+            ]
+        });
+
+        if (!tela) {
+            LanzarError('Tela no encontrada', 404, 'Validacion');
+        }
+
+        return tela;
+
+    } catch (error) {
+        console.error(error);
+        LanzarError('Error al obtener tela', 500, 'Error');
+    }
+};
+
+// EDITAR
+const EditarTipoTela = async (codigo, data) => {
+    try {
+
+        const { NombreTipoTela } = data;
+
+        const tipo = await TipoTelaModelo.findByPk(codigo);
+
+        if (!tipo) {
+            LanzarError('Tipo de tela no encontrado', 404, 'Validacion');
+        }
+
+        const existe = await TipoTelaModelo.findOne({
+            where: {
+                NombreTipoTela,
+                CodigoTipoTela: { [Op.ne]: codigo }
+            }
+        });
+
+        if (existe) {
+            LanzarError('Ya existe un tipo de tela con ese nombre', 400, 'Validacion');
+        }
+
+        await tipo.update({
+            NombreTipoTela
+        });
+
+        return {
+            CodigoTipoTela: tipo.CodigoTipoTela,
+            NombreTipoTela: tipo.NombreTipoTela
+        };
+
+    } catch (error) {
+        console.error(error);
+        LanzarError('Error al editar tipo de tela', 500, 'Error');
+    }
+};
+
+const EditarTela = async (codigo, data) => {
+    try {
+
+        const { CodigoTipoTela, NombreTela } = data;
+
+        const tela = await TelaModelo.findByPk(codigo);
+
+        if (!tela) {
+            LanzarError('Tela no encontrada', 404, 'Validacion');
+        }
+
+        if (CodigoTipoTela) {
+            const tipoTela = await TipoTelaModelo.findByPk(CodigoTipoTela);
+
+            if (!tipoTela) {
+                LanzarError('El tipo de tela no existe', 400, 'Validacion');
+            }
+        }
+
+        if (NombreTela) {
+            const existe = await TelaModelo.findOne({
+                where: {
+                    NombreTela,
+                    CodigoTela: { [Op.ne]: codigo }
+                }
+            });
+
+            if (existe) {
+                LanzarError('Ya existe una tela con ese nombre', 400, 'Validacion');
+            }
+        }
+
+        await tela.update({
+            CodigoTipoTela,
+            NombreTela
+        });
+
+        return {
+            CodigoTela: tela.CodigoTela,
+            CodigoTipoTela: tela.CodigoTipoTela,
+            NombreTela: tela.NombreTela
+        };
+
+    } catch (error) {
+        console.error(error);
+        LanzarError('Error al editar tela', 500, 'Error');
+    }
+};
+// ELIMINAR
+const EliminarTipoTela = async (codigo) => {
+    try {
+
+        const tipo = await TipoTelaRelacion.findOne({
+            where: {
+                CodigoTipoTela: codigo
+            }
+        });
+
+        if (!tipo) {
+            LanzarError('Tipo de tela no encontrado', 404, 'Validacion');
+        }
+
+        // eliminación física
+        await TipoTelaRelacion.destroy({
+            where: {
+                CodigoTipoTela: codigo
+            }
+        });
+
+        return {
+            message: 'Tipo de tela eliminado correctamente'
+        };
+
+    } catch (error) {
+        console.error(error);
+        LanzarError('Error al eliminar tipo de tela', 500, 'Error');
+    }
+};
+
+const EliminarTela = async (codigo) => {
+    try {
+
+        const tela = await TelaModelo.findOne({
+            where: {
+                CodigoTela: codigo,
+                Estatus: 1
+            }
+        });
+
+        if (!tela) {
+            LanzarError('Tela no encontrada', 404, 'Validacion');
+        }
+
+        await tela.update({
+            Estatus: 0
+        });
+
+        return {
+            message: 'Tela eliminada correctamente'
+        };
+
+    } catch (error) {
+
+        console.error(error);
+
+        LanzarError(
+            'Error al eliminar tela',
+            500,
+            'Error'
+        );
+    }
+};
 
 const ObtenerInventarioListado = async (CodigoEmpresa) => {
     try {
@@ -693,469 +1053,20 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
     }
 };
 
-
-const ListadoTipoProducto = async () => {
-    try {
-        // Obtenemos todos los tipos de producto activos (Estatus = 1)
-        const tipos = await TipoProductoModelo.findAll({
-            where: { Estatus: 1 },
-            attributes: ['CodigoTipoProducto', 'NombreTipoProducto'],
-            order: [['NombreTipoProducto', 'ASC']]
-        });
-
-        // Mapear al formato que queremos enviar al frontend
-        return tipos.map(t => ({
-            CodigoTipoProducto: t.CodigoTipoProducto,
-            NombreTipoProducto: t.NombreTipoProducto
-        }));
-
-    } catch (error) {
-        console.error('Error en ListadoTipoProducto:', error);
-        LanzarError('Error al obtener tipos de producto', 500, 'Error');
-    }
-};
-//LISTADOS
-const ListadoMarca = async () => {
-
-    try {
-
-        const marcas = await MarcaModelo.findAll({
-
-            where: {
-                Estatus: 1
-            },
-
-            attributes: [
-                'CodigoMarca',
-                'NombreMarca'
-            ],
-
-            order: [['NombreMarca', 'ASC']]
-
-        });
-
-        return marcas.map(m => ({
-            CodigoMarca: m.CodigoMarca,
-            NombreMarca: m.NombreMarca
-        }));
-
-    } catch (error) {
-
-        console.error(error);
-
-        LanzarError('Error al obtener marcas', 500, 'Error');
-
-    }
-
-};
-
-const ListadoEstilo = async () => {
-
-    try {
-
-        const estilos = await EstiloModelo.findAll({
-
-            where: {
-                Estatus: 1
-            },
-
-            attributes: [
-                'CodigoEstilo',
-                'NombreEstilo'
-            ],
-
-            order: [['NombreEstilo', 'ASC']]
-
-        });
-
-        return estilos.map(e => ({
-            CodigoEstilo: e.CodigoEstilo,
-            NombreEstilo: e.NombreEstilo
-        }));
-
-    } catch (error) {
-
-        console.error(error);
-
-        LanzarError('Error al obtener estilos', 500, 'Error');
-
-    }
-
-};
-
-const ListadoTalla = async () => {
-
-    try {
-
-        const tallas = await TallaModelo.findAll({
-
-            where: {
-                Estatus: 1
-            },
-
-            attributes: [
-                'CodigoTalla',
-                'NombreTalla'
-            ],
-
-            order: [['NombreTalla', 'ASC']]
-
-        });
-
-        return tallas.map(t => ({
-            CodigoTalla: t.CodigoTalla,
-            NombreTalla: t.NombreTalla
-        }));
-
-    } catch (error) {
-
-        console.error(error);
-
-        LanzarError('Error al obtener tallas', 500, 'Error');
-
-    }
-
-};
-
-const ListadoColor = async () => {
-
-    try {
-
-        const colores = await ColorModelo.findAll({
-
-            where: {
-                Estatus: 1
-            },
-
-            attributes: [
-                'CodigoColor',
-                'NombreColor'
-            ],
-
-            order: [['NombreColor', 'ASC']]
-
-        });
-
-        return colores.map(c => ({
-            CodigoColor: c.CodigoColor,
-            NombreColor: c.NombreColor
-        }));
-
-    } catch (error) {
-
-        console.error(error);
-
-        LanzarError('Error al obtener colores', 500, 'Error');
-
-    }
-
-};
-//CREAR
-const CrearMarca = async (NombreMarca) => {
-
-    try {
-
-        const nuevaMarca = await MarcaModelo.create({
-            NombreMarca,
-            Estatus: 1
-        });
-
-        return {
-            CodigoMarca: nuevaMarca.CodigoMarca,
-            NombreMarca: nuevaMarca.NombreMarca
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al crear marca', 500, 'Error');
-
-    }
-
-};
-
-const CrearEstilo = async (NombreEstilo) => {
-
-    try {
-
-        const nuevoEstilo = await EstiloModelo.create({
-            NombreEstilo,
-            Estatus: 1
-        });
-
-        return {
-            CodigoEstilo: nuevoEstilo.CodigoEstilo,
-            NombreEstilo: nuevoEstilo.NombreEstilo
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al crear estilo', 500, 'Error');
-
-    }
-
-};
-
-const CrearTalla = async (NombreTalla) => {
-
-    try {
-
-        const nuevaTalla = await TallaModelo.create({
-            NombreTalla,
-            Estatus: 1
-        });
-
-        return {
-            CodigoTalla: nuevaTalla.CodigoTalla,
-            NombreTalla: nuevaTalla.NombreTalla
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al crear talla', 500, 'Error');
-
-    }
-
-};
-
-const CrearColor = async (NombreColor) => {
-
-    try {
-
-        const nuevoColor = await ColorModelo.create({
-            NombreColor,
-            Estatus: 1
-        });
-
-        return {
-            CodigoColor: nuevoColor.CodigoColor,
-            NombreColor: nuevoColor.NombreColor
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al crear color', 500, 'Error');
-
-    }
-
-};
-//OBTENER POR CODIGO
-const ObtenerMarcaPorCodigo = async (CodigoMarca) => {
-
-    try {
-
-        const marca = await MarcaModelo.findByPk(CodigoMarca);
-
-        if (!marca) {
-            LanzarError('Marca no encontrada', 404, 'Error');
-        }
-
-        return {
-            CodigoMarca: marca.CodigoMarca,
-            NombreMarca: marca.NombreMarca
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al obtener marca', 500, 'Error');
-
-    }
-
-};
-
-const ObtenerEstiloPorCodigo = async (CodigoEstilo) => {
-
-    try {
-
-        const estilo = await EstiloModelo.findByPk(CodigoEstilo);
-
-        if (!estilo) {
-            LanzarError('Estilo no encontrado', 404, 'Error');
-        }
-
-        return {
-            CodigoEstilo: estilo.CodigoEstilo,
-            NombreEstilo: estilo.NombreEstilo
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al obtener estilo', 500, 'Error');
-
-    }
-
-};
-
-const ObtenerTallaPorCodigo = async (CodigoTalla) => {
-
-    try {
-
-        const talla = await TallaModelo.findByPk(CodigoTalla);
-
-        if (!talla) {
-            LanzarError('Talla no encontrada', 404, 'Error');
-        }
-
-        return {
-            CodigoTalla: talla.CodigoTalla,
-            NombreTalla: talla.NombreTalla
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al obtener talla', 500, 'Error');
-
-    }
-
-};
-
-const ObtenerColorPorCodigo = async (CodigoColor) => {
-
-    try {
-
-        const color = await ColorModelo.findByPk(CodigoColor);
-
-        if (!color) {
-            LanzarError('Color no encontrado', 404, 'Error');
-        }
-
-        return {
-            CodigoColor: color.CodigoColor,
-            NombreColor: color.NombreColor
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al obtener color', 500, 'Error');
-
-    }
-
-};
-
-//EDITAR
-const ActualizarMarca = async (CodigoMarca, NombreMarca) => {
-
-    try {
-
-        const marca = await MarcaModelo.findByPk(CodigoMarca);
-
-        if (!marca) {
-            LanzarError('Marca no encontrada', 404, 'Error');
-        }
-
-        marca.NombreMarca = NombreMarca;
-
-        await marca.save();
-
-        return {
-            CodigoMarca: marca.CodigoMarca,
-            NombreMarca: marca.NombreMarca
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al actualizar marca', 500, 'Error');
-
-    }
-
-};
-
-const ActualizarEstilo = async (CodigoEstilo, NombreEstilo) => {
-
-    try {
-
-        const estilo = await EstiloModelo.findByPk(CodigoEstilo);
-
-        if (!estilo) {
-            LanzarError('Estilo no encontrado', 404, 'Error');
-        }
-
-        estilo.NombreEstilo = NombreEstilo;
-
-        await estilo.save();
-
-        return {
-            CodigoEstilo: estilo.CodigoEstilo,
-            NombreEstilo: estilo.NombreEstilo
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al actualizar estilo', 500, 'Error');
-
-    }
-
-};
-
-const ActualizarTalla = async (CodigoTalla, NombreTalla) => {
-
-    try {
-
-        const talla = await TallaModelo.findByPk(CodigoTalla);
-
-        if (!talla) {
-            LanzarError('Talla no encontrada', 404, 'Error');
-        }
-
-        talla.NombreTalla = NombreTalla;
-
-        await talla.save();
-
-        return {
-            CodigoTalla: talla.CodigoTalla,
-            NombreTalla: talla.NombreTalla
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al actualizar talla', 500, 'Error');
-
-    }
-
-};
-
-const ActualizarColor = async (CodigoColor, NombreColor) => {
-
-    try {
-
-        const color = await ColorModelo.findByPk(CodigoColor);
-
-        if (!color) {
-            LanzarError('Color no encontrado', 404, 'Error');
-        }
-
-        color.NombreColor = NombreColor;
-
-        await color.save();
-
-        return {
-            CodigoColor: color.CodigoColor,
-            NombreColor: color.NombreColor
-        };
-
-    } catch (error) {
-
-        console.error(error);
-        LanzarError('Error al actualizar color', 500, 'Error');
-
-    }
-
-};
-
 module.exports = {
-    CrearProductoInventario, ListadoMarca, ListadoEstilo, ListadoTalla,
-    ListadoColor, ListadoTipoProducto, ObtenerInventarioListado, EliminarInventario,
-    ObtenerInventarioEliminados, RestaurarInventario, ObtenerInventarioPorCodigo, ActualizarProductoInventario,
-    CrearMarca, CrearEstilo, CrearTalla, CrearColor, ActualizarMarca, ActualizarEstilo, ActualizarTalla, ActualizarColor,
-    ObtenerMarcaPorCodigo, ObtenerEstiloPorCodigo, ObtenerTallaPorCodigo, ObtenerColorPorCodigo
+    EliminarTipoTela,EliminarTela,
+    CrearProductoInventario,
+    ObtenerInventarioListado,
+    ObtenerInventarioPorCodigo,
+    RestaurarInventario,
+    EliminarInventario,
+    ObtenerInventarioEliminados,
+    ActualizarProductoInventario, ListadoTipoTela, ListadoNombreTela,
+    CrearTipoTela,
+    EditarTipoTela,
+    ObtenerTipoTelaPorCodigo,
+    CrearTela,
+    EditarTela,
+    ObtenerTelaPorCodigo
+
 };

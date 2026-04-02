@@ -1,4 +1,4 @@
-const Servicio = require('../Servicios/InventarioServicio');
+const Servicio = require('../Servicios/ConfiguracionServicio');
 const ManejarError = require('../Utilidades/ErrorControladores');
 const ResponderExito = require('../Utilidades/RespuestaExitosaControlador');
 
@@ -133,8 +133,6 @@ const ObtenerInventarioEliminados = async (req, res) => {
     }
 };
 
-
-
 const ActualizarProductoInventario = async (req, res) => {
     try {
         const { CodigoInventario } = req.params;
@@ -166,43 +164,16 @@ const ActualizarProductoInventario = async (req, res) => {
         );
     }
 };
-
-
-
-const ListadoTipoProducto = async (req, res) => {
-
-    try {
-
-        const Objeto = await Servicio.ListadoTipoProducto();
-
-        return ResponderExito(
-            res,
-            'Marcas obtenidas correctamente.',
-            Objeto || []
-        );
-
-    } catch (error) {
-
-        return ManejarError(
-            error,
-            res,
-            'Error al obtener marcas'
-        );
-
-    }
-
-};
-
 //LISTADOS
-const ListadoMarca = async (req, res) => {
+const ListadoTipoTela = async (req, res) => {
 
     try {
 
-        const Objeto = await Servicio.ListadoMarca();
+        const Objeto = await Servicio.ListadoTipoTela();
 
         return ResponderExito(
             res,
-            'Marcas obtenidas correctamente.',
+            'Tipos de tela obtenidos correctamente.',
             Objeto || []
         );
 
@@ -211,22 +182,22 @@ const ListadoMarca = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al obtener marcas'
+            'Error al obtener tipos de tela'
         );
 
     }
 
 };
 
-const ListadoEstilo = async (req, res) => {
+const ListadoTela = async (req, res) => {
 
     try {
 
-        const Objeto = await Servicio.ListadoEstilo();
+        const Objeto = await Servicio.ListadoNombreTela();
 
         return ResponderExito(
             res,
-            'Estilos obtenidos correctamente.',
+            'Telas obtenidas correctamente.',
             Objeto || []
         );
 
@@ -235,74 +206,25 @@ const ListadoEstilo = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al obtener estilos'
+            'Error al obtener telas'
         );
 
     }
 
 };
+// =============================
+// CREAR
+// =============================
 
-
-const ListadoTalla = async (req, res) => {
-
-    try {
-
-        const Objeto = await Servicio.ListadoTalla();
-
-        return ResponderExito(
-            res,
-            'Tallas obtenidas correctamente.',
-            Objeto || []
-        );
-
-    } catch (error) {
-
-        return ManejarError(
-            error,
-            res,
-            'Error al obtener tallas'
-        );
-
-    }
-
-};
-
-const ListadoColor = async (req, res) => {
+const CrearTipoTela = async (req, res) => {
 
     try {
 
-        const Objeto = await Servicio.ListadoColor();
+        const Objeto = await Servicio.CrearTipoTela(req.body);
 
         return ResponderExito(
             res,
-            'Colores obtenidos correctamente.',
-            Objeto || []
-        );
-
-    } catch (error) {
-
-        return ManejarError(
-            error,
-            res,
-            'Error al obtener colores'
-        );
-
-    }
-
-};
-
-//CREAR
-const CrearMarca = async (req, res) => {
-
-    try {
-
-        const { NombreMarca } = req.body;
-
-        const Objeto = await Servicio.CrearMarca(NombreMarca);
-
-        return ResponderExito(
-            res,
-            'Marca creada correctamente.',
+            'Tipo de tela creado correctamente.',
             Objeto
         );
 
@@ -311,24 +233,22 @@ const CrearMarca = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al crear marca'
+            'Error al crear tipo de tela'
         );
 
     }
 
 };
 
-const CrearEstilo = async (req, res) => {
+const CrearTela = async (req, res) => {
 
     try {
 
-        const { NombreEstilo } = req.body;
-
-        const Objeto = await Servicio.CrearEstilo(NombreEstilo);
+        const Objeto = await Servicio.CrearTela(req.body);
 
         return ResponderExito(
             res,
-            'Estilo creado correctamente.',
+            'Tela creada correctamente.',
             Objeto
         );
 
@@ -337,24 +257,29 @@ const CrearEstilo = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al crear estilo'
+            'Error al crear tela'
         );
 
     }
 
 };
 
-const CrearTalla = async (req, res) => {
+
+// =============================
+// OBTENER POR CODIGO
+// =============================
+
+const ObtenerTipoTelaPorCodigo = async (req, res) => {
 
     try {
 
-        const { NombreTalla } = req.body;
+        const { codigo } = req.params;
 
-        const Objeto = await Servicio.CrearTalla(NombreTalla);
+        const Objeto = await Servicio.ObtenerTipoTelaPorCodigo(codigo);
 
         return ResponderExito(
             res,
-            'Talla creada correctamente.',
+            'Tipo de tela obtenido correctamente.',
             Objeto
         );
 
@@ -363,24 +288,24 @@ const CrearTalla = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al crear talla'
+            'Error al obtener tipo de tela'
         );
 
     }
 
 };
 
-const CrearColor = async (req, res) => {
+const ObtenerTelaPorCodigo = async (req, res) => {
 
     try {
 
-        const { NombreColor } = req.body;
+        const { codigo } = req.params;
 
-        const Objeto = await Servicio.CrearColor(NombreColor);
+        const Objeto = await Servicio.ObtenerTelaPorCodigo(codigo);
 
         return ResponderExito(
             res,
-            'Color creado correctamente.',
+            'Tela obtenida correctamente.',
             Objeto
         );
 
@@ -389,26 +314,32 @@ const CrearColor = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al crear color'
+            'Error al obtener tela'
         );
 
     }
 
 };
-//OBTENER POR CODIGO
-const ObtenerMarcaPorCodigo = async (req, res) => {
+
+
+// =============================
+// EDITAR
+// =============================
+
+const EditarTipoTela = async (req, res) => {
 
     try {
 
-        const { CodigoMarca } = req.params;
+        const { codigo } = req.params;
 
-        const Objeto = await Servicio.ObtenerMarcaPorCodigo(
-            CodigoMarca
+        const Objeto = await Servicio.EditarTipoTela(
+            codigo,
+            req.body
         );
 
         return ResponderExito(
             res,
-            'Marca obtenida correctamente.',
+            'Tipo de tela editado correctamente.',
             Objeto
         );
 
@@ -417,26 +348,27 @@ const ObtenerMarcaPorCodigo = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al obtener marca'
+            'Error al editar tipo de tela'
         );
 
     }
 
 };
 
-const ObtenerEstiloPorCodigo = async (req, res) => {
+const EditarTela = async (req, res) => {
 
     try {
 
-        const { CodigoEstilo } = req.params;
+        const { codigo } = req.params;
 
-        const Objeto = await Servicio.ObtenerEstiloPorCodigo(
-            CodigoEstilo
+        const Objeto = await Servicio.EditarTela(
+            codigo,
+            req.body
         );
 
         return ResponderExito(
             res,
-            'Estilo obtenido correctamente.',
+            'Tela editada correctamente.',
             Objeto
         );
 
@@ -445,26 +377,26 @@ const ObtenerEstiloPorCodigo = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al obtener estilo'
+            'Error al editar tela'
         );
 
     }
 
 };
-
-const ObtenerTallaPorCodigo = async (req, res) => {
+// =============================
+// ELIMINAR
+// =============================
+const EliminarTipoTela = async (req, res) => {
 
     try {
 
-        const { CodigoTalla } = req.params;
+        const { codigo } = req.params;
 
-        const Objeto = await Servicio.ObtenerTallaPorCodigo(
-            CodigoTalla
-        );
+        const Objeto = await Servicio.EliminarTipoTela(codigo);
 
         return ResponderExito(
             res,
-            'Talla obtenida correctamente.',
+            'Tipo de tela eliminado correctamente.',
             Objeto
         );
 
@@ -473,26 +405,24 @@ const ObtenerTallaPorCodigo = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al obtener talla'
+            'Error al eliminar tipo de tela'
         );
 
     }
 
 };
 
-const ObtenerColorPorCodigo = async (req, res) => {
+const EliminarTela = async (req, res) => {
 
     try {
 
-        const { CodigoColor } = req.params;
+        const { codigo } = req.params;
 
-        const Objeto = await Servicio.ObtenerColorPorCodigo(
-            CodigoColor
-        );
+        const Objeto = await Servicio.EliminarTela(codigo);
 
         return ResponderExito(
             res,
-            'Color obtenido correctamente.',
+            'Tela eliminada correctamente.',
             Objeto
         );
 
@@ -501,124 +431,7 @@ const ObtenerColorPorCodigo = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al obtener color'
-        );
-
-    }
-
-};
-
-// ACTUALIZAR
-const ActualizarMarca = async (req, res) => {
-
-    try {
-
-        const { CodigoMarca, NombreMarca } = req.body;
-
-        const Objeto = await Servicio.ActualizarMarca(
-            CodigoMarca,
-            NombreMarca
-        );
-
-        return ResponderExito(
-            res,
-            'Marca actualizada correctamente.',
-            Objeto
-        );
-
-    } catch (error) {
-
-        return ManejarError(
-            error,
-            res,
-            'Error al actualizar marca'
-        );
-
-    }
-
-};
-
-const ActualizarEstilo = async (req, res) => {
-
-    try {
-
-        const { CodigoEstilo, NombreEstilo } = req.body;
-
-        const Objeto = await Servicio.ActualizarEstilo(
-            CodigoEstilo,
-            NombreEstilo
-        );
-
-        return ResponderExito(
-            res,
-            'Estilo actualizado correctamente.',
-            Objeto
-        );
-
-    } catch (error) {
-
-        return ManejarError(
-            error,
-            res,
-            'Error al actualizar estilo'
-        );
-
-    }
-
-};
-
-const ActualizarTalla = async (req, res) => {
-
-    try {
-
-        const { CodigoTalla, NombreTalla } = req.body;
-
-        const Objeto = await Servicio.ActualizarTalla(
-            CodigoTalla,
-            NombreTalla
-        );
-
-        return ResponderExito(
-            res,
-            'Talla actualizada correctamente.',
-            Objeto
-        );
-
-    } catch (error) {
-
-        return ManejarError(
-            error,
-            res,
-            'Error al actualizar talla'
-        );
-
-    }
-
-};
-
-const ActualizarColor = async (req, res) => {
-
-    try {
-
-        const { CodigoColor, NombreColor } = req.body;
-
-        const Objeto = await Servicio.ActualizarColor(
-            CodigoColor,
-            NombreColor
-        );
-
-        return ResponderExito(
-            res,
-            'Color actualizado correctamente.',
-            Objeto
-        );
-
-    } catch (error) {
-
-        return ManejarError(
-            error,
-            res,
-            'Error al actualizar color'
+            'Error al eliminar tela'
         );
 
     }
@@ -626,9 +439,12 @@ const ActualizarColor = async (req, res) => {
 };
 
 module.exports = {
-    CrearProductoInventario, ListadoMarca, ListadoEstilo, ListadoTalla,
-    ListadoColor, ListadoTipoProducto, ObtenerInventarioListado, EliminarInventario,
-    ObtenerInventarioEliminados, RestaurarInventario, ObtenerInventarioPorCodigo, ActualizarProductoInventario,
-    CrearMarca, CrearEstilo, CrearTalla, CrearColor, ActualizarMarca, ActualizarEstilo, ActualizarTalla, ActualizarColor,
-    ObtenerMarcaPorCodigo, ObtenerEstiloPorCodigo, ObtenerTallaPorCodigo, ObtenerColorPorCodigo
+    CrearProductoInventario, ObtenerInventarioListado, ObtenerInventarioPorCodigo, RestaurarInventario,
+    EliminarInventario, ObtenerInventarioEliminados, ActualizarProductoInventario, ListadoTela, ListadoTipoTela,
+    CrearTipoTela,
+    CrearTela,
+    ObtenerTipoTelaPorCodigo,
+    ObtenerTelaPorCodigo,
+    EditarTipoTela,
+    EditarTela, EliminarTipoTela, EliminarTela
 };
