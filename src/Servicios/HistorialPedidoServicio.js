@@ -1,11 +1,17 @@
 const Sequelize = require('sequelize');
 const BaseDatos = require('../BaseDatos/ConexionBaseDatos');
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
+
+
 
 const { PedidoModelo, ClienteModelo, EstadoPedidoModelo, UsuarioModelo,
     ProductoModelo, PedidoDetalleModelo, InventarioModelo, PedidoDetalleMedidaModelo,
     TipoProductoModelo, TipoMedidaModelo, PagoModelo, PagoAplicacionModelo, TipoTelaModelo,
-    TelaModelo, MovimientoInventarioModelo  } = require('../Relaciones/Relaciones');
+    TelaModelo, MovimientoInventarioModelo } = require('../Relaciones/Relaciones');
 
+const EmpresaModelo = require('../Modelos/Empresa')(BaseDatos, Sequelize.DataTypes);
 const TipoProducto = require('../Modelos/TipoProducto')(BaseDatos, Sequelize.DataTypes);
 const TipoTela = require('../Modelos/TipoTela')(BaseDatos, Sequelize.DataTypes);
 const Tela = require('../Modelos/Tela')(BaseDatos, Sequelize.DataTypes);
@@ -17,9 +23,12 @@ const PedidoDetalle = require('../Modelos/PedidoDetalle')(BaseDatos, Sequelize.D
 const PedidoDetalleMedida = require('../Modelos/PedidoDetalleMedida')(BaseDatos, Sequelize.DataTypes);
 const TipoMedida = require('../Modelos/TipoMedida')(BaseDatos, Sequelize.DataTypes);
 const FormaPago = require('../Modelos/FormaPago')(BaseDatos, Sequelize.DataTypes);
+const { GenerarDocumento } = require('../Utilidades/GeneradorDocumento');
 const { LanzarError } = require('../Utilidades/ErrorServicios');
 const { Op } = require('sequelize');
+
 const CrearPedido = async (datos, usuario) => {
+
     const transaccion = await BaseDatos.transaction();
 
     try {
@@ -30,11 +39,30 @@ const CrearPedido = async (datos, usuario) => {
         if (!datos.Productos || datos.Productos.length === 0)
             LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
 
+        const CodigoEmpresa = 1;
+
+        // ================= GENERAR DOCUMENTO DEL PEDIDO =================
+        const documentoPedido = await GenerarDocumento(
+            'PEDIDO',
+            CodigoEmpresa,
+            transaccion
+        );
+
+        if (!documentoPedido)
+            LanzarError('No se pudo generar el documento del pedido', 500);
+
+        // ================= CREAR PEDIDO =================
         const pedido = await PedidoModelo.create({
-            CodigoEmpresa: 1,
+
+            CodigoEmpresa,
             CodigoCliente: datos.CodigoCliente,
             CodigoEstadoPedido: datos.CodigoEstadoPedido || 1,
             CodigoUsuario: usuario,
+
+            Serie: documentoPedido.Serie,
+            TipoDocumento: documentoPedido.TipoDocumento,
+            NumeroDocumento: documentoPedido.NumeroDocumento,
+            Numero: documentoPedido.Numero,
 
             FechaCreacion: new Date(),
             FechaEntrega: datos.FechaEntrega,
@@ -43,30 +71,31 @@ const CrearPedido = async (datos, usuario) => {
             Descuento: datos.Descuento,
             Total: datos.Total,
 
+            Observaciones: datos.Observaciones || null,
             Estatus: 1
+
         }, { transaction: transaccion });
 
+        // ================= PRODUCTOS =================
         for (const producto of datos.Productos) {
 
             const inventario = await InventarioModelo.findOne({
-                where: {
-                    CodigoProducto: producto.CodigoProducto,
-                    Estatus: 1
-                },
+                where: { CodigoProducto: producto.CodigoProducto, Estatus: 1 },
                 transaction: transaccion,
-                lock: true
+                lock: transaccion.LOCK.UPDATE
             });
 
             if (!inventario)
-                LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400, 'Advertencia');
+                LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400);
 
             if (inventario.StockActual < producto.Cantidad)
-                LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400, 'Advertencia');
+                LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400);
 
             const stockAnterior = inventario.StockActual;
             const stockNuevo = stockAnterior - producto.Cantidad;
 
             const detalle = await PedidoDetalleModelo.create({
+
                 CodigoPedido: pedido.CodigoPedido,
                 CodigoInventario: inventario.CodigoInventario,
 
@@ -80,19 +109,15 @@ const CrearPedido = async (datos, usuario) => {
                 Cantidad: producto.Cantidad,
                 PrecioVenta: producto.Precio,
                 Subtotal: producto.Subtotal,
-
                 Estatus: 1
+
             }, { transaction: transaccion });
 
             // ================= MEDIDAS =================
             if (producto.Medidas) {
+                for (const key in producto.Medidas) {
 
-                const medidas = producto.Medidas;
-
-                for (const key in medidas) {
-
-                    const valor = medidas[key];
-
+                    const valor = producto.Medidas[key];
                     if (valor === null || valor === undefined || valor === '')
                         continue;
 
@@ -114,232 +139,943 @@ const CrearPedido = async (datos, usuario) => {
                 }
             }
 
-            // ================= ACTUALIZAR INVENTARIO =================
-            await inventario.update({
-                StockActual: stockNuevo
-            }, { transaction: transaccion });
+            // ================= INVENTARIO =================
+            await inventario.update({ StockActual: stockNuevo }, { transaction: transaccion });
 
-            // ================= MOVIMIENTO INVENTARIO =================
+            // ================= MOVIMIENTO =================
             await MovimientoInventarioModelo.create({
 
-                CodigoEmpresa: 1,
+                CodigoEmpresa,
                 CodigoInventario: inventario.CodigoInventario,
                 CodigoUsuario: usuario,
 
                 TipoMovimiento: 'SALIDA',
                 OrigenMovimiento: 'PEDIDO',
 
-                TipoDocumento: 'PEDIDO',
+                TipoDocumento: documentoPedido.TipoDocumento,
                 CodigoDocumento: pedido.CodigoPedido,
+                NumeroDocumento: documentoPedido.NumeroDocumento,
 
                 Cantidad: producto.Cantidad,
-
                 StockAnterior: stockAnterior,
                 StockNuevo: stockNuevo,
 
                 FechaMovimiento: new Date(),
-                Observacion: `Salida por pedido ${pedido.CodigoPedido}`,
-
-                Estatus: 1,
-                FechaCreacion: new Date()
+                Observacion: `Salida por pedido ${documentoPedido.NumeroDocumento}`
 
             }, { transaction: transaccion });
         }
 
-        // ================= PAGO =================
+        // ================= PAGO INICIAL (SI EXISTE) =================
         if (datos.MontoPago && datos.FormaPago) {
 
-            const totalPedido = datos.Total;
-            const montoPago = datos.MontoPago;
+            // ================= GENERAR DOCUMENTO DEL PAGO =================
+            // ✅ Aquí enviamos CodigoPedido para que la numeración sea correcta
+            const documentoPago = await GenerarDocumento(
+                'PAGO',
+                CodigoEmpresa,
+                transaccion,
+                pedido.CodigoPedido
+            );
 
-            if (montoPago < 0)
-                LanzarError('El monto de pago no puede ser negativo', 400, 'Advertencia');
+            if (!documentoPago)
+                LanzarError('No se pudo generar el documento de pago', 500);
 
-            if (montoPago > totalPedido)
-                LanzarError(
-                    `El monto de pago (${montoPago.toFixed(2)}) excede el total del pedido (${totalPedido.toFixed(2)})`,
-                    400,
-                    'Advertencia'
-                );
+            const saldoAnterior = 0; // primer pago
+            const saldoPendiente = Number(pedido.Total) - Number(datos.MontoPago);
 
             const pago = await PagoModelo.create({
-                CodigoEmpresa: 1,
+
+                CodigoEmpresa,
                 CodigoUsuario: usuario,
                 CodigoFormaPago: datos.FormaPago,
-                Monto: montoPago,
+
+                Serie: documentoPago.Serie,
+                TipoDocumento: documentoPago.TipoDocumento,
+                NumeroDocumento: documentoPago.NumeroDocumento,
+                Numero: documentoPago.Numero,
+
+                SaldoAnterior: saldoAnterior,
+                SaldoPendiente: saldoPendiente,
+
+                Monto: datos.MontoPago,
                 FechaPago: new Date(),
-                Estatus: 1,
-                NumeroComprobante: datos.Referencia || null
+
+                NumeroComprobante: datos.Referencia || null,
+                UrlImagen: datos.UrlImagen || null,
+                Observacion: datos.Observacion || null,
+
+                Estatus: 1
+
             }, { transaction: transaccion });
 
             await PagoAplicacionModelo.create({
-                CodigoPedido: pedido.CodigoPedido,
+
                 CodigoPago: pago.CodigoPago,
-                MontoAplicado: montoPago,
+
                 TipoDocumento: 'PEDIDO',
                 CodigoDocumento: pedido.CodigoPedido,
-                Estatus: 1
+                NumeroDocumento: documentoPago.NumeroDocumento,
+
+                MontoAplicado: datos.MontoPago,
+                SaldoAnterior: saldoAnterior,
+                SaldoPendiente: saldoPendiente
+
             }, { transaction: transaccion });
         }
 
         await transaccion.commit();
 
-        return { CodigoPedido: pedido.CodigoPedido };
+        return {
+            CodigoPedido: pedido.CodigoPedido,
+            NumeroDocumento: documentoPedido.NumeroDocumento
+        };
 
     } catch (error) {
 
-        try { await transaccion.rollback(); } catch (_) { }
+        await transaccion.rollback();
+        throw error;
+    }
+};
+const ObtenerPedido = async (CodigoPedido) => {
+    try {
+
+        if (!CodigoPedido)
+            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+
+        // ===================== PEDIDO =====================
+        const pedido = await PedidoModelo.findOne({
+            where: {
+                CodigoPedido,
+                Estatus: 1
+            },
+            attributes: [
+                'CodigoPedido',
+                'CodigoCliente',
+                'CodigoUsuario',
+                'NumeroDocumento',
+                'FechaEntrega',
+                'CodigoEstadoPedido',
+                'Descuento',
+                'Subtotal',
+                'Total'
+            ],
+            include: [
+                {
+                    model: ClienteModelo,
+                    as: 'CaCliente',
+                    attributes: ['CodigoCliente', 'NombreCliente']
+                },
+                {
+                    model: UsuarioModelo,
+                    as: 'AdUsuario',
+                    attributes: ['CodigoUsuario', 'NombreUsuario']
+                },
+                {
+                    model: EstadoPedidoModelo,
+                    as: 'CaEstadoPedido',
+                    attributes: ['NombreEstadoPedido']
+                },
+                {
+                    model: PagoAplicacionModelo,
+                    as: 'PagosAplicados',
+                    attributes: [
+                        'CodigoPagoAplicacion',
+                        'CodigoPago',
+                        'MontoAplicado'
+                    ],
+                    include: [
+                        {
+                            model: PagoModelo,
+                            as: 'FnPago',
+                            attributes: [
+                                'CodigoFormaPago',
+                                'Monto',
+                                'FechaPago'
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        if (!pedido)
+            LanzarError('Pedido no encontrado', 404, 'Advertencia');
+
+
+        // ===================== DETALLES =====================
+        const detalles = await PedidoDetalleModelo.findAll({
+            where: {
+                CodigoPedido,
+                Estatus: 1
+            },
+            include: [
+                {
+                    model: InventarioModelo,
+                    as: 'Inventario',
+                    attributes: [
+                        'CodigoInventario',
+                        'CodigoProducto'
+                    ],
+                    include: [
+                        {
+                            model: ProductoModelo,
+                            as: 'Producto',
+                            attributes: [
+                                'CodigoProducto',
+                                'NombreProducto',
+                                'CodigoTipoProducto'
+                            ],
+                            include: [
+                                {
+                                    model: TipoProductoModelo,
+                                    as: 'TipoProducto',
+                                    attributes: [
+                                        'CodigoTipoProducto',
+                                        'NombreTipoProducto'
+                                    ],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    model: TipoTelaModelo,
+                    as: 'TipoTela',
+                    attributes: [
+                        'CodigoTipoTela',
+                        'NombreTipoTela'
+                    ],
+                    required: false
+                },
+                {
+                    model: TelaModelo,
+                    as: 'Tela',
+                    attributes: [
+                        'CodigoTela',
+                        'NombreTela'
+                    ],
+                    required: false
+                }
+            ]
+        });
+
+
+        const productos = [];
+
+        for (const det of detalles) {
+
+            const medidasDB = await PedidoDetalleMedidaModelo.findAll({
+                where: {
+                    CodigoPedidoDetalle: det.CodigoPedidoDetalle
+                },
+                include: [
+                    {
+                        model: TipoMedidaModelo,
+                        as: 'TipoMedidaDetalle',
+                        attributes: ['NombreTipoMedida']
+                    }
+                ]
+            });
+
+            const medidas = {};
+
+            for (const m of medidasDB) {
+
+                const nombre = m.TipoMedidaDetalle?.NombreTipoMedida;
+                if (!nombre) continue;
+
+                if (m.Valor != null)
+                    medidas[nombre] = m.Valor;
+                else if (m.Descripcion != null)
+                    medidas[nombre] = m.Descripcion;
+                else
+                    medidas[nombre] = null;
+            }
+
+            productos.push({
+
+                CodigoProducto: det.Inventario?.Producto?.CodigoProducto || null,
+                NombreProducto: det.Inventario?.Producto?.NombreProducto || '',
+                CodigoTipoProducto: det.Inventario?.Producto?.TipoProducto?.CodigoTipoProducto || null,
+                NombreTipoProducto: det.Inventario?.Producto?.TipoProducto?.NombreTipoProducto || '',
+
+                CodigoTipoTela: det.CodigoTipoTela || null,
+                NombreTipoTela: det.TipoTela?.NombreTipoTela || '',
+
+                CodigoTela: det.CodigoTela || null,
+                NombreTela: det.Tela?.NombreTela || '',
+
+                Codigo: det.Codigo || null,
+                Color: det.Color || '',
+                Referencia: det.Referencia || '',
+
+                Cantidad: det.Cantidad || 0,
+                Precio: det.PrecioVenta || 0,
+                Subtotal: det.Subtotal || 0,
+
+                Medidas: medidas
+            });
+        }
+
+
+        // ===================== PAGOS =====================
+        const totalAbonado =
+            pedido.PagosAplicados?.reduce(
+                (acc, pa) => acc + parseFloat(pa.MontoAplicado || 0),
+                0
+            ) || 0;
+
+        const saldoPendiente =
+            (pedido.Total || 0) - totalAbonado;
+
+
+        // ===================== RESPUESTA =====================
+        return {
+
+            CodigoPedido: pedido.CodigoPedido,
+            NumeroDocumento: pedido.NumeroDocumento,
+
+            CodigoCliente: pedido.CodigoCliente,
+            NombreCliente: pedido.CaCliente?.NombreCliente || '',
+
+            CodigoUsuario: pedido.CodigoUsuario,
+            NombreUsuario: pedido.AdUsuario?.NombreUsuario || '',
+
+            FechaEntrega: pedido.FechaEntrega,
+            CodigoEstadoPedido: pedido.CodigoEstadoPedido,
+            NombreEstadoPedido: pedido.CaEstadoPedido?.NombreEstadoPedido || '',
+
+            Descuento: pedido.Descuento || 0,
+            Subtotal: pedido.Subtotal || 0,
+            Total: pedido.Total || 0,
+
+            TotalAbonado: totalAbonado,
+            SaldoPendiente: saldoPendiente,
+
+            Pagos: pedido.PagosAplicados || [],
+            Productos: productos
+        };
+
+    } catch (error) {
+
+        console.error('Error original en ObtenerPedido:', error);
+
+        if (!error.statusCode)
+            LanzarError('Error al obtener pedido', 500, 'Error');
 
         throw error;
     }
 };
-// const CrearPedido = async (datos, usuario) => {
-//     const transaccion = await BaseDatos.transaction();
+const GenerarPDFPedido = async (CodigoPedido, res) => {
+    try {
 
-//     try {
+        if (!CodigoPedido)
+            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
 
-//         if (!datos.CodigoCliente)
-//             LanzarError('El cliente es obligatorio', 400, 'Advertencia');
 
-//         if (!datos.Productos || datos.Productos.length === 0)
-//             LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
+        // ================= EMPRESA =================
+        const empresa = await EmpresaModelo.findOne({
+            where: { CodigoEmpresa: 1, Estatus: 1 }
+        });
 
-//         const pedido = await PedidoModelo.create({
-//             CodigoEmpresa: 1,
-//             CodigoCliente: datos.CodigoCliente,
-//             CodigoEstadoPedido: datos.CodigoEstadoPedido || 1,
-//             CodigoUsuario: usuario,
+        if (!empresa)
+            LanzarError('Empresa no encontrada', 404, 'Advertencia');
 
-//             FechaCreacion: new Date(),
-//             FechaEntrega: datos.FechaEntrega,
 
-//             Subtotal: datos.Subtotal,
-//             Descuento: datos.Descuento,
-//             Total: datos.Total,
+        // ================= PEDIDO =================
+        const pedido = await ObtenerPedido(Number(CodigoPedido));
 
-//             Estatus: 1
-//         }, { transaction: transaccion });
 
-//         for (const producto of datos.Productos) {
+        // ================= CLIENTE =================
+        const cliente = await ClienteModelo.findOne({
+            where: {
+                CodigoCliente: pedido.CodigoCliente,
+                Estatus: 1
+            }
+        });
 
-//             const inventario = await InventarioModelo.findOne({
-//                 where: {
-//                     CodigoProducto: producto.CodigoProducto,
-//                     Estatus: 1
-//                 },
-//                 transaction: transaccion
-//             });
+        if (!cliente)
+            LanzarError('Cliente no encontrado', 404, 'Advertencia');
 
-//             if (!inventario)
-//                 LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400, 'Advertencia');
 
-//             if (inventario.StockActual < producto.Cantidad)
-//                 LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400, 'Advertencia');
+        // ================= FORMAS DE PAGO =================
+        const formasPagoDB = await FormaPago.findAll({
+            attributes: ['CodigoFormaPago', 'NombreFormaPago']
+        });
 
-//             // 🔥 YA NO GUARDAMOS SELECTS COMO FK
-//             const detalle = await PedidoDetalleModelo.create({
-//                 CodigoPedido: pedido.CodigoPedido,
-//                 CodigoInventario: inventario.CodigoInventario,
+        const mapaFormaPago = {};
 
-//                 CodigoTipoTela: producto.CodigoTipoTela || null,
-//                 CodigoTela: producto.CodigoTela || null,
+        formasPagoDB.forEach(f => {
+            mapaFormaPago[f.CodigoFormaPago] = f.NombreFormaPago;
+        });
 
-//                 Codigo: producto.Codigo || null,
-//                 Color: producto.Color || null,
-//                 Referencia: producto.Referencia || null,
 
-//                 Cantidad: producto.Cantidad,
-//                 PrecioVenta: producto.Precio,
-//                 Subtotal: producto.Subtotal,
+        // ================= PAGOS DESDE BD =================
+        const pagosDB = await PagoAplicacionModelo.findAll({
+            where: {
+                CodigoDocumento: CodigoPedido
+            },
+            attributes: [
+                'CodigoPagoAplicacion',
+                'CodigoPago',
+                'TipoDocumento',
+                'CodigoDocumento',
+                'MontoAplicado'
+            ],
+            include: [
+                {
+                    model: PagoModelo,
+                    as: 'FnPago',
+                    where: { Estatus: 1 }, // SOLO Pago tiene Estatus
+                    attributes: [
+                        'CodigoPago',
+                        'CodigoFormaPago',
+                        'Monto',
+                        'NumeroComprobante'
+                    ],
+                    required: false
+                }
+            ]
+        });
 
-//                 Estatus: 1
-//             }, { transaction: transaccion });
 
-//             // 📏 GUARDAR TODAS LAS MEDIDAS (NUM + STRING)
-//             if (producto.Medidas) {
+        // ================= IDENTIFICAR PAGOS =================
+        let tarjetaPago = null;
+        let otroPago = null;
 
-//                 const medidas = producto.Medidas;
+        pagosDB.forEach(p => {
 
-//                 for (const key in medidas) {
+            const nombreFormaPago =
+                mapaFormaPago[p.FnPago?.CodigoFormaPago] || 'Sin forma';
 
-//                     const valor = medidas[key];
+            if (nombreFormaPago.toLowerCase().includes('tarjeta')) {
 
-//                     if (valor === null || valor === undefined || valor === '')
-//                         continue;
+                tarjetaPago = {
+                    nombre: nombreFormaPago,
+                    monto: p.MontoAplicado,
+                    numeroComprobante: p.FnPago?.NumeroComprobante
+                };
 
-//                     const tipoMedida = await TipoMedidaModelo.findOne({
-//                         where: { NombreTipoMedida: key },
-//                         transaction: transaccion
-//                     });
+            } else {
 
-//                     if (!tipoMedida) continue;
+                otroPago = {
+                    nombre: nombreFormaPago,
+                    monto: p.MontoAplicado
+                };
+            }
+        });
 
-//                     const esNumero = typeof valor === 'number';
 
-//                     await PedidoDetalleMedidaModelo.create({
-//                         CodigoPedidoDetalle: detalle.CodigoPedidoDetalle,
-//                         CodigoTipoMedida: tipoMedida.CodigoTipoMedida,
+        // ================= FECHAS =================
+        const fechaPedido = new Date().toLocaleDateString();
 
-//                         // 🔥 CLAVE
-//                         Valor: esNumero ? valor : null,
-//                         Descripcion: !esNumero ? String(valor) : null
+        const fechaEntrega = pedido.FechaEntrega
+            ? new Date(pedido.FechaEntrega).toLocaleDateString()
+            : '';
 
-//                     }, { transaction: transaccion });
-//                 }
-//             }
 
-//             await inventario.update({
-//                 StockActual: inventario.StockActual - producto.Cantidad
-//             }, { transaction: transaccion });
-//         }
+        // ================= PDF =================
+        const doc = new PDFDocument({ margin: 40 });
 
-//         // 💰 PAGO
-//         if (datos.MontoPago && datos.FormaPago) {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename=pedido_${CodigoPedido}.pdf`
+        );
 
-//             // 🔹 Validación de monto de pago
-//             const totalPedido = datos.Total; // total del pedido
-//             const montoPago = datos.MontoPago;
+        doc.pipe(res);
 
-//             if (montoPago < 0) {
-//                 LanzarError('El monto de pago no puede ser negativo', 400, 'Advertencia');
-//             }
+        doc.lineWidth(1);
+        doc.strokeColor('#bfbfbf');
 
-//             if (montoPago > totalPedido) {
-//                 LanzarError(`El monto de pago (${montoPago.toFixed(2)}) excede el total del pedido (${totalPedido.toFixed(2)})`, 400, 'Advertencia');
-//             }
 
-//             // 🔹 Crear el pago si pasa la validación
-//             const pago = await PagoModelo.create({
-//                 CodigoEmpresa: 1,
-//                 CodigoUsuario: usuario,
-//                 CodigoFormaPago: datos.FormaPago,
-//                 Monto: montoPago,
-//                 FechaPago: new Date(),
-//                 Estatus: 1,
-//                 NumeroComprobante: datos.Referencia || null
-//             }, { transaction: transaccion });
+        // ================= LOGO =================
+        const logoPath = path.join(
+            __dirname,
+            '../public/LogoConfeccionesCreateli.png'
+        );
 
-//             await PagoAplicacionModelo.create({
-//                 CodigoPedido: pedido.CodigoPedido,
-//                 CodigoPago: pago.CodigoPago,
-//                 MontoAplicado: montoPago,
-//                 TipoDocumento: 'PEDIDO',
-//                 CodigoDocumento: pedido.CodigoPedido,
-//                 Estatus: 1
-//             }, { transaction: transaccion });
-//         }
+        if (fs.existsSync(logoPath)) {
+            doc.image(logoPath, 470, 40, { width: 70 });
+        }
 
-//         await transaccion.commit();
 
-//         return { CodigoPedido: pedido.CodigoPedido };
+        // ================= EMPRESA =================
+        doc.fillColor('black')
+            .font('Helvetica-Bold')
+            .fontSize(18)
+            .text(empresa.NombreEmpresa, 40, 40);
 
-//     } catch (error) {
+        doc.font('Helvetica')
+            .fontSize(10)
+            .text(`NIT: ${empresa.NIT}`, 40, 70)
+            .text(`Dirección: ${empresa.Direccion}`, 40, 85)
+            .text(`Teléfono: ${empresa.Telefono}`, 40, 100);
 
-//         try { await transaccion.rollback(); } catch (_) { }
 
-//         throw error;
-//     }
-// };
+        // ================= TABLA CLIENTE =================
+        let inicioY = 140;
+        let anchoTabla = 510;
+        let altoTabla = 120;
+        let headerHeight = 30;
+
+        doc.roundedRect(40, inicioY, anchoTabla, altoTabla, 6).stroke();
+
+        doc.save()
+            .roundedRect(40, inicioY, anchoTabla, headerHeight, 6)
+            .clip()
+            .rect(40, inicioY, anchoTabla, headerHeight)
+            .fill('#e6e6e6')
+            .restore();
+
+        doc.moveTo(40, inicioY + headerHeight)
+            .lineTo(550, inicioY + headerHeight)
+            .stroke();
+
+        doc.moveTo(300, inicioY + headerHeight)
+            .lineTo(300, inicioY + altoTabla)
+            .stroke();
+
+        doc.font('Helvetica-Bold').fontSize(12);
+
+        doc.text('Información del cliente', 50, inicioY + 10);
+        doc.text(`Documento: ${pedido.NumeroDocumento}`, 320, inicioY + 10);
+
+        doc.font('Helvetica').fontSize(10);
+
+        doc.text(`Cliente: ${cliente.NombreCliente}`, 50, inicioY + 40);
+        doc.text(`Nit: ${cliente.NIT || ''}`, 50, inicioY + 55);
+        doc.text(`Dirección: ${cliente.Direccion || ''}`, 50, inicioY + 70);
+        doc.text(`Celular: ${cliente.Celular || ''}`, 50, inicioY + 85);
+
+        doc.text(`Fecha: ${fechaPedido}`, 320, inicioY + 40);
+        doc.text(`Atendido: ${pedido.NombreUsuario}`, 320, inicioY + 55);
+        doc.text(`Fecha Entrega: ${fechaEntrega}`, 320, inicioY + 70);
+
+
+        // ================= TABLA PRODUCTOS =================
+        let y = inicioY + 150;
+        let altoFila = 20;
+        let alturaProductos = (pedido.Productos.length + 1) * altoFila;
+
+        doc.roundedRect(40, y, 510, alturaProductos, 6).stroke();
+
+        doc.save()
+            .roundedRect(40, y, 510, altoFila, 6)
+            .clip()
+            .rect(40, y, 510, altoFila)
+            .fill('#e6e6e6')
+            .restore();
+
+        doc.font('Helvetica-Bold').fontSize(11);
+
+        doc.text('CANTIDAD', 50, y + 5);
+        doc.text('PRODUCTO', 150, y + 5);
+        doc.text('TOTAL', 400, y + 5, { width: 140, align: 'right' });
+
+        y += altoFila;
+
+        doc.font('Helvetica').fontSize(10);
+
+        pedido.Productos.forEach(prod => {
+
+            doc.moveTo(40, y)
+                .lineTo(550, y)
+                .stroke();
+
+            doc.text(prod.Cantidad, 50, y + 5);
+
+            doc.text(prod.NombreProducto, 150, y + 5, {
+                width: 220
+            });
+
+            doc.text(
+                `Q ${prod.Subtotal.toFixed(2)}`,
+                400,
+                y + 5,
+                { width: 140, align: 'right' }
+            );
+
+            y += altoFila;
+        });
+
+
+        // ================= TOTALES =================
+        let totalesY = y + 25;
+
+        let xLabel = 380;
+        let xMonto = 430;
+        let anchoMonto = 120;
+
+        doc.font('Helvetica');
+
+        doc.text('Subtotal:', xLabel, totalesY);
+        doc.text(`Q ${pedido.Subtotal.toFixed(2)}`, xMonto, totalesY, { width: anchoMonto, align: 'right' });
+
+        totalesY += 15;
+
+        doc.text('Descuento:', xLabel, totalesY);
+        doc.text(`Q ${pedido.Descuento.toFixed(2)}`, xMonto, totalesY, { width: anchoMonto, align: 'right' });
+
+        totalesY += 15;
+
+        doc.font('Helvetica-Bold');
+
+        doc.text('Total de tu orden:', xLabel, totalesY);
+        doc.text(`Q ${pedido.Total.toFixed(2)}`, xMonto, totalesY, { width: anchoMonto, align: 'right' });
+
+        totalesY += 15;
+
+        doc.font('Helvetica');
+
+        let abonadoY = totalesY;
+
+        doc.text('Abonado:', xLabel, totalesY);
+        doc.text(`Q ${pedido.TotalAbonado.toFixed(2)}`, xMonto, totalesY, { width: anchoMonto, align: 'right' });
+
+        totalesY += 15;
+
+        let saldoY = totalesY;
+
+        doc.text('Saldo Pendiente:', xLabel, totalesY);
+        doc.text(`Q ${pedido.SaldoPendiente.toFixed(2)}`, xMonto, totalesY, { width: anchoMonto, align: 'right' });
+
+
+        // ================= FORMA DE PAGO =================
+        if (tarjetaPago) {
+
+            let xLabelPago = 40;
+            let xValorPago = 140; // columna alineada
+
+            doc.font('Helvetica-Bold')
+                .text('TARJETA:', xLabelPago, abonadoY);
+
+            doc.font('Helvetica')
+                .text(`Q ${tarjetaPago.monto.toFixed(2)}`, xValorPago, abonadoY);
+
+            if (tarjetaPago.numeroComprobante) {
+
+                doc.font('Helvetica-Bold')
+                    .text('REFERENCIA:', xLabelPago, saldoY);
+
+                doc.font('Helvetica')
+                    .text(`${tarjetaPago.numeroComprobante}`, xValorPago, saldoY);
+            }
+        }
+
+        if (otroPago && !tarjetaPago) {
+
+            let xLabelPago = 40;
+            let xValorPago = 140;
+
+            doc.font('Helvetica-Bold')
+                .text(`${otroPago.nombre.toUpperCase()}:`, xLabelPago, saldoY);
+
+            doc.font('Helvetica')
+                .text(`Q ${otroPago.monto.toFixed(2)}`, xValorPago, saldoY);
+        }
+
+        // ================= FINAL =================
+        doc.end();
+
+    } catch (error) {
+
+        console.error('Error al generar PDF:', error);
+
+        LanzarError(
+            error.message || 'Error al generar el PDF del pedido',
+            error.statusCode || 500,
+            'Error'
+        );
+    }
+};
+const GenerarPDFPagoPedido = async (CodigoPago, res) => {
+    try {
+        if (!CodigoPago)
+            LanzarError('El código de pago es obligatorio', 400, 'Advertencia');
+
+        // ================= EMPRESA =================
+        const empresa = await EmpresaModelo.findOne({
+            where: { CodigoEmpresa: 1, Estatus: 1 }
+        });
+        if (!empresa)
+            LanzarError('Empresa no encontrada', 404, 'Advertencia');
+
+        // ================= PAGO =================
+        const pagoAplicacion = await PagoAplicacionModelo.findOne({
+            where: { CodigoPago, TipoDocumento: 'PEDIDO' },
+            attributes: ['CodigoPago', 'CodigoDocumento', 'MontoAplicado'],
+            include: [{
+                model: PagoModelo,
+                as: 'FnPago',
+                attributes: [
+                    'CodigoFormaPago', 'NumeroComprobante', 'NumeroDocumento',
+                    'FechaPago', 'SaldoAnterior', 'SaldoPendiente', 'Estatus'
+                ],
+                required: true
+            }]
+        });
+        if (!pagoAplicacion || !pagoAplicacion.FnPago)
+            LanzarError('Pago no encontrado', 404, 'Advertencia');
+        if (Number(pagoAplicacion.FnPago.Estatus) !== 1)
+            LanzarError('El pago está inactivo', 400, 'Advertencia');
+
+        // ================= PEDIDO =================
+        const CodigoPedido = pagoAplicacion.CodigoDocumento;
+        const pedido = await ObtenerPedido(Number(CodigoPedido));
+        if (!pedido)
+            LanzarError('Pedido no encontrado', 404, 'Advertencia');
+
+        // ================= CLIENTE =================
+        const cliente = await ClienteModelo.findOne({
+            where: { CodigoCliente: pedido.CodigoCliente, Estatus: 1 }
+        });
+        if (!cliente)
+            LanzarError('Cliente no encontrado', 404, 'Advertencia');
+
+        // ================= FORMAS DE PAGO =================
+        const formasPagoDB = await FormaPago.findAll({ attributes: ['CodigoFormaPago', 'NombreFormaPago'] });
+        const mapaFormaPago = {};
+        formasPagoDB.forEach(f => { mapaFormaPago[f.CodigoFormaPago] = f.NombreFormaPago; });
+
+        // ================= DATOS =================
+        const formaPagoNombre = mapaFormaPago[pagoAplicacion.FnPago.CodigoFormaPago] || 'Sin forma';
+        const numeroReferencia = pagoAplicacion.FnPago.NumeroComprobante || '';
+        const abono = Number(pagoAplicacion.MontoAplicado);
+        const saldoAnterior = Number(pagoAplicacion.FnPago.SaldoAnterior || 0);
+        const saldoPendiente = Number(pagoAplicacion.FnPago.SaldoPendiente || 0);
+        const fechaPago = pagoAplicacion.FnPago.FechaPago ? new Date(pagoAplicacion.FnPago.FechaPago).toLocaleDateString() : new Date().toLocaleDateString();
+        const fechaEntrega = pedido.FechaEntrega ? new Date(pedido.FechaEntrega).toLocaleDateString() : '';
+
+        // ================= PDF =================
+        const doc = new PDFDocument({ margin: 40 });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=pago_${CodigoPago}.pdf`);
+        doc.pipe(res);
+
+        doc.lineWidth(1).strokeColor('#bfbfbf');
+
+        // ================= LOGO =================
+        const logoPath = path.join(__dirname, '../public/LogoConfeccionesCreateli.png');
+        if (fs.existsSync(logoPath)) doc.image(logoPath, 470, 40, { width: 70 });
+
+        // ================= EMPRESA =================
+        doc.fillColor('black')
+            .font('Helvetica-Bold').fontSize(18).text(empresa.NombreEmpresa, 40, 40);
+        doc.font('Helvetica').fontSize(10)
+            .text(`NIT: ${empresa.NIT}`, 40, 70)
+            .text(`Dirección: ${empresa.Direccion}`, 40, 85)
+            .text(`Teléfono: ${empresa.Telefono}`, 40, 100);
+
+        // ================= TABLA CLIENTE =================
+        const inicioY = 140;
+        const anchoTabla = 510;
+        const altoTabla = 120;
+        const headerHeight = 30;
+
+        doc.roundedRect(40, inicioY, anchoTabla, altoTabla, 6).stroke();
+        doc.save().roundedRect(40, inicioY, anchoTabla, headerHeight, 6).clip().rect(40, inicioY, anchoTabla, headerHeight).fill('#e6e6e6').restore();
+        doc.moveTo(40, inicioY + headerHeight).lineTo(550, inicioY + headerHeight).stroke();
+        doc.moveTo(300, inicioY + headerHeight).lineTo(300, inicioY + altoTabla).stroke();
+
+        doc.font('Helvetica-Bold').fontSize(12);
+        doc.text('Recibo de Abono', 50, inicioY + 10);
+        doc.text(`Documento: ${pagoAplicacion.FnPago.NumeroDocumento}`, 320, inicioY + 10);
+
+        doc.font('Helvetica').fontSize(10);
+        doc.text(`Cliente: ${cliente.NombreCliente}`, 50, inicioY + 40);
+        doc.text(`Nit: ${cliente.NIT || ''}`, 50, inicioY + 55);
+        doc.text(`Dirección: ${cliente.Direccion || ''}`, 50, inicioY + 70);
+        doc.text(`Celular: ${cliente.Celular || ''}`, 50, inicioY + 85);
+        doc.text(`Fecha Pago: ${fechaPago}`, 320, inicioY + 40);
+        doc.text(`Atendido: ${pedido.NombreUsuario}`, 320, inicioY + 55);
+        doc.text(`Fecha Entrega: ${fechaEntrega}`, 320, inicioY + 70);
+
+        // ================= NO. PEDIDO =================
+        let totalesY = inicioY + altoTabla + 10;
+        const xIzquierda = 50;
+        const xDerechaLabel = 400;
+        const xDerechaMonto = 420;
+        const anchoMonto = 120;
+
+        doc.font('Helvetica-Bold').fontSize(10)
+            .text('No. Pedido:', xIzquierda, totalesY)
+            .font('Helvetica').text(pedido.NumeroDocumento || '', xIzquierda + 70, totalesY);
+
+        totalesY += 20;
+
+        // ================= TOTALES DERECHA =================
+        doc.font('Helvetica-Bold').text('Saldo Anterior:', xDerechaLabel, totalesY);
+        doc.font('Helvetica').text(`Q ${saldoAnterior.toFixed(2)}`, xDerechaMonto, totalesY, { width: anchoMonto, align: 'right' });
+
+        totalesY += 20;
+        doc.font('Helvetica-Bold').text('Abonado:', xDerechaLabel, totalesY);
+        doc.font('Helvetica').text(`Q ${abono.toFixed(2)}`, xDerechaMonto, totalesY, { width: anchoMonto, align: 'right' });
+
+        totalesY += 20;
+        doc.font('Helvetica-Bold').text('Saldo Pendiente:', xDerechaLabel, totalesY);
+        doc.font('Helvetica').text(`Q ${saldoPendiente.toFixed(2)}`, xDerechaMonto, totalesY, { width: anchoMonto, align: 'right' });
+
+        // ================= COLUMNA IZQUIERDA =================
+        const yIzquierda = totalesY - 20; // Alineada a la línea de "Abonado"
+
+        // Forma de pago: título en negrita, valor normal
+        doc.font('Helvetica-Bold').text(`${formaPagoNombre.toUpperCase()}:`, xIzquierda, yIzquierda, { continued: true });
+        doc.font('Helvetica').text(` Q ${abono.toFixed(2)}`); // valor sin negrita
+
+        if (formaPagoNombre.toUpperCase() === 'TARJETA') {
+            const yReferencia = yIzquierda + 20; // debajo de la forma de pago
+            doc.font('Helvetica-Bold').text('Referencia:', xIzquierda, yReferencia, { continued: true });
+            doc.font('Helvetica').text(` ${numeroReferencia}`); // valor sin negrita
+        }
+        // ================= FINAL =================
+        doc.end();
+
+    } catch (error) {
+        console.error('Error al generar PDF de pago:', error);
+        LanzarError(error.message || 'Error al generar PDF de pago del pedido', error.statusCode || 500, 'Error');
+    }
+};
+const RegistrarPagoPedido = async (datos, usuario) => {
+
+    const transaccion = await BaseDatos.transaction();
+
+    try {
+
+        // ================= VALIDACIONES =================
+        if (!datos.CodigoPedido)
+            LanzarError('El pedido es obligatorio', 400, 'Advertencia');
+
+        if (!datos.MontoPago)
+            LanzarError('El monto del pago es obligatorio', 400, 'Advertencia');
+
+        if (!datos.FormaPago)
+            LanzarError('La forma de pago es obligatoria', 400, 'Advertencia');
+
+        if (datos.MontoPago <= 0)
+            LanzarError('El monto debe ser mayor a cero', 400, 'Advertencia');
+
+        const CodigoEmpresa = 1;
+
+        // ================= PEDIDO =================
+        const pedido = await PedidoModelo.findOne({
+            where: { CodigoPedido: datos.CodigoPedido },
+            transaction: transaccion
+        });
+
+        if (!pedido)
+            LanzarError('El pedido no existe', 404, 'Advertencia');
+
+        // ================= PAGOS ACTUALES =================
+        const pagos = await PagoAplicacionModelo.findAll({
+            where: {
+                TipoDocumento: 'PEDIDO',
+                CodigoDocumento: datos.CodigoPedido
+            },
+            attributes: ['MontoAplicado'],
+            transaction: transaccion
+        });
+
+        const totalPagado = pagos.reduce(
+            (sum, p) => sum + Number(p.MontoAplicado),
+            0
+        );
+
+        const saldoAnterior = Number(pedido.Total) - totalPagado;
+
+        if (saldoAnterior <= 0)
+            LanzarError('El pedido ya está pagado', 400, 'Advertencia');
+
+        if (datos.MontoPago > saldoAnterior)
+            LanzarError('El monto excede el saldo pendiente', 400, 'Advertencia');
+
+        // ================= NUEVO SALDO =================
+        const saldoPendiente = saldoAnterior - Number(datos.MontoPago);
+
+        // ================= GENERAR DOCUMENTO =================
+        // ✅ Enviar CodigoPedido para que la numeración sea por pedido
+        const documento = await GenerarDocumento(
+            'PAGO',
+            CodigoEmpresa,
+            transaccion,
+            datos.CodigoPedido
+        );
+
+        if (!documento)
+            LanzarError(
+                'No se pudo generar el documento de pago',
+                500,
+                'Error'
+            );
+
+        // ================= CREAR PAGO =================
+        const pago = await PagoModelo.create({
+
+            CodigoEmpresa,
+            CodigoUsuario: usuario,
+            CodigoFormaPago: datos.FormaPago,
+
+            Serie: documento.Serie,
+            TipoDocumento: documento.TipoDocumento,
+            NumeroDocumento: documento.NumeroDocumento,
+            Numero: documento.Numero,
+
+            SaldoAnterior: saldoAnterior,
+            SaldoPendiente: saldoPendiente,
+
+            Monto: datos.MontoPago,
+            FechaPago: new Date(),
+
+            NumeroComprobante: datos.Referencia || null,
+            UrlImagen: datos.UrlImagen || null,
+            Observacion: datos.Observacion || null,
+
+            Estatus: 1
+
+        }, { transaction: transaccion });
+
+        // ================= APLICAR PAGO =================
+        await PagoAplicacionModelo.create({
+
+            CodigoPago: pago.CodigoPago,
+
+            TipoDocumento: 'PEDIDO',
+            CodigoDocumento: datos.CodigoPedido,
+            NumeroDocumento: documento.NumeroDocumento,
+
+            MontoAplicado: datos.MontoPago,
+            SaldoAnterior: saldoAnterior,
+            SaldoPendiente: saldoPendiente
+
+        }, { transaction: transaccion });
+
+        // ================= ACTUALIZAR PEDIDO =================
+        await pedido.update({
+            CodigoEstadoPedido: saldoPendiente === 0 ? 2 : 1
+        }, { transaction: transaccion });
+
+        await transaccion.commit();
+
+        // ================= RESPUESTA =================
+        return {
+            CodigoPago: pago.CodigoPago,
+            CodigoPedido: datos.CodigoPedido,
+            NumeroDocumento: documento.NumeroDocumento,
+            TotalPedido: pedido.Total,
+            SaldoAnterior: saldoAnterior,
+            Abono: datos.MontoPago,
+            SaldoPendiente: saldoPendiente
+        };
+
+    } catch (error) {
+        try {
+            await transaccion.rollback();
+        } catch (_) { }
+        throw error;
+    }
+};
 
 const EliminarPedido = async (CodigoPedido) => {
 
@@ -467,116 +1203,6 @@ const EliminarPedido = async (CodigoPedido) => {
         throw error;
     }
 };
-// const EliminarPedido = async (CodigoPedido) => {
-
-//     const transaccion = await BaseDatos.transaction();
-
-//     try {
-
-//         if (!CodigoPedido)
-//             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
-
-//         // ===================== PEDIDO =====================
-//         const pedido = await PedidoModelo.findOne({
-//             where: { CodigoPedido },
-//             transaction: transaccion
-//         });
-
-//         if (!pedido)
-//             LanzarError('El pedido no existe', 404, 'Advertencia');
-
-
-//         // ===================== DETALLES =====================
-//         const detalles = await PedidoDetalleModelo.findAll({
-//             where: { CodigoPedido },
-//             transaction: transaccion
-//         });
-
-//         for (const detalle of detalles) {
-
-//             // 🔄 Restaurar inventario
-//             const inventario = await InventarioModelo.findOne({
-//                 where: {
-//                     CodigoInventario: detalle.CodigoInventario
-//                 },
-//                 transaction: transaccion
-//             });
-
-//             if (inventario) {
-
-//                 await inventario.update({
-//                     StockActual: inventario.StockActual + detalle.Cantidad
-//                 }, { transaction: transaccion });
-
-//             }
-
-//             // 🗑️ Eliminar medidas
-//             await PedidoDetalleMedidaModelo.destroy({
-//                 where: {
-//                     CodigoPedidoDetalle: detalle.CodigoPedidoDetalle
-//                 },
-//                 transaction: transaccion
-//             });
-
-//             // 🗑️ Eliminar detalle
-//             await detalle.destroy({
-//                 transaction: transaccion
-//             });
-//         }
-
-
-//         // ===================== PAGOS =====================
-//         const pagosAplicados = await PagoAplicacionModelo.findAll({
-//             where: {
-//                 TipoDocumento: 'PEDIDO',
-//                 CodigoDocumento: CodigoPedido
-//             },
-//             transaction: transaccion
-//         });
-
-//         for (const pagoAplicacion of pagosAplicados) {
-
-//             // 🗑️ Eliminar PagoAplicacion
-//             await pagoAplicacion.destroy({
-//                 transaction: transaccion
-//             });
-
-//             // 🗑️ Eliminar Pago
-//             await PagoModelo.destroy({
-//                 where: {
-//                     CodigoPago: pagoAplicacion.CodigoPago
-//                 },
-//                 transaction: transaccion
-//             });
-//         }
-
-
-//         // ===================== PEDIDO =====================
-//         await pedido.destroy({
-//             transaction: transaccion
-//         });
-
-
-//         await transaccion.commit();
-
-//         return {
-//             CodigoPedido,
-//             TotalDetalles: detalles.length,
-//             TotalPagos: pagosAplicados.length,
-//             Mensaje: 'Pedido eliminado completamente'
-//         };
-
-//     } catch (error) {
-
-//         try {
-//             await transaccion.rollback();
-//         } catch (_) { }
-
-//         console.error(error);
-//         throw error;
-//     }
-// };
-
 const ListarPagosPorPedido = async (codigoPedido) => {
 
     try {
@@ -644,6 +1270,7 @@ const ListarPagosPorPedido = async (codigoPedido) => {
             return {
                 Correlativo: index + 1,
                 Fecha: pago?.FechaPago || null,
+                CodigoPago: p.CodigoPago,
                 FormaPago: mapaFormaPago[pago?.CodigoFormaPago] || 'Sin forma',
                 Monto: Number(p.MontoAplicado || 0)
             };
@@ -661,341 +1288,6 @@ const ListarPagosPorPedido = async (codigoPedido) => {
     }
 
 };
-
-const RegistrarPagoPedido = async (datos, usuario) => {
-    const transaccion = await BaseDatos.transaction();
-
-    try {
-        if (!datos.CodigoPedido) LanzarError('El pedido es obligatorio', 400, 'Advertencia');
-        if (!datos.MontoPago) LanzarError('El monto del pago es obligatorio', 400, 'Advertencia');
-        if (!datos.FormaPago) LanzarError('La forma de pago es obligatoria', 400, 'Advertencia');
-        if (datos.MontoPago <= 0) LanzarError('El monto debe ser mayor a cero', 400, 'Advertencia');
-
-        // 🔎 Buscar pedido
-        const pedido = await PedidoModelo.findOne({
-            where: { CodigoPedido: datos.CodigoPedido },
-            transaction: transaccion
-        });
-
-        if (!pedido) LanzarError('El pedido no existe', 404, 'Advertencia');
-
-        // 💰 Total pagado hasta ahora
-        const pagos = await PagoAplicacionModelo.findAll({
-            where: { TipoDocumento: 'PEDIDO', CodigoDocumento: datos.CodigoPedido },
-            attributes: ['MontoAplicado'],
-            transaction: transaccion
-        });
-
-        const totalPagado = pagos.reduce((sum, p) => sum + Number(p.MontoAplicado), 0);
-        const saldo = Number(pedido.Total) - totalPagado;
-
-        if (saldo <= 0) LanzarError('El pedido ya está pagado', 400, 'Advertencia');
-        if (datos.MontoPago > saldo) LanzarError('El monto excede el saldo pendiente', 400, 'Advertencia');
-
-        // 💳 Crear pago
-        const pago = await PagoModelo.create({
-            CodigoEmpresa: 1,
-            CodigoUsuario: usuario,
-            CodigoFormaPago: datos.FormaPago,
-            Monto: datos.MontoPago,
-            FechaPago: new Date()
-        }, { transaction: transaccion });
-
-        // 📄 Aplicar pago al pedido
-        await PagoAplicacionModelo.create({
-            CodigoPago: pago.CodigoPago,
-            TipoDocumento: 'PEDIDO',
-            CodigoDocumento: datos.CodigoPedido,
-            MontoAplicado: datos.MontoPago
-        }, { transaction: transaccion });
-
-        // 🔄 Recalcular total pagado y saldo
-        const nuevoTotalPagado = totalPagado + Number(datos.MontoPago);
-        const nuevoSaldo = Number(pedido.Total) - nuevoTotalPagado;
-
-        // 🟢 Actualizar estado del pedido
-        await pedido.update({
-            CodigoEstadoPedido: nuevoSaldo === 0 ? 2 : 1
-        }, { transaction: transaccion });
-
-        await transaccion.commit();
-
-        return {
-            CodigoPedido: datos.CodigoPedido,
-            CodigoPago: pago.CodigoPago,
-            TotalPedido: pedido.Total,
-            TotalPagado: nuevoTotalPagado,
-            SaldoRestante: nuevoSaldo
-        };
-
-    } catch (error) {
-        try { await transaccion.rollback(); } catch (_) { }
-        throw error;
-    }
-};
-const ObtenerPedido = async (CodigoPedido) => {
-    try {
-
-        if (!CodigoPedido)
-            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
-
-        // ===================== PEDIDO =====================
-        const pedido = await PedidoModelo.findOne({
-            where: {
-                CodigoPedido,
-                Estatus: 1
-            },
-            include: [
-                {
-                    model: ClienteModelo,
-                    as: 'CaCliente',
-                    attributes: ['CodigoCliente', 'NombreCliente']
-                },
-                {
-                    model: EstadoPedidoModelo,
-                    as: 'CaEstadoPedido',
-                    attributes: ['NombreEstadoPedido']
-                },
-                {
-                    model: PagoAplicacionModelo,
-                    as: 'PagosAplicados',
-                    attributes: [
-                        'CodigoPagoAplicacion',
-                        'CodigoPago',
-                        'MontoAplicado'
-                    ],
-                    include: [
-                        {
-                            model: PagoModelo,
-                            as: 'FnPago',
-                            attributes: [
-                                'CodigoFormaPago',
-                                'Monto',
-                                'FechaPago'
-                            ]
-                        }
-                    ]
-                }
-            ]
-        });
-
-        if (!pedido)
-            LanzarError('Pedido no encontrado', 404, 'Advertencia');
-
-
-        // ===================== DETALLES =====================
-        const detalles = await PedidoDetalleModelo.findAll({
-            where: {
-                CodigoPedido,
-                Estatus: 1
-            },
-            include: [
-                {
-                    model: InventarioModelo,
-                    as: 'Inventario',
-                    attributes: [
-                        'CodigoInventario',
-                        'CodigoProducto'
-                    ],
-                    include: [
-                        {
-                            model: ProductoModelo,
-                            as: 'Producto',
-                            attributes: [
-                                'CodigoProducto',
-                                'NombreProducto',
-                                'CodigoTipoProducto'
-                            ],
-                            include: [
-                                {
-                                    model: TipoProductoModelo,
-                                    as: 'TipoProducto',
-                                    attributes: [
-                                        'CodigoTipoProducto',
-                                        'NombreTipoProducto'
-                                    ],
-                                    required: false
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    model: TipoTelaModelo,
-                    as: 'TipoTela',
-                    attributes: [
-                        'CodigoTipoTela',
-                        'NombreTipoTela'
-                    ],
-                    required: false
-                },
-                {
-                    model: TelaModelo,
-                    as: 'Tela',
-                    attributes: [
-                        'CodigoTela',
-                        'NombreTela'
-                    ],
-                    required: false
-                }
-            ]
-        });
-
-
-        const productos = [];
-
-        for (const det of detalles) {
-
-            // ===================== MEDIDAS =====================
-            const medidasDB = await PedidoDetalleMedidaModelo.findAll({
-                where: {
-                    CodigoPedidoDetalle: det.CodigoPedidoDetalle
-                },
-                include: [
-                    {
-                        model: TipoMedidaModelo,
-                        as: 'TipoMedidaDetalle',
-                        attributes: ['NombreTipoMedida']
-                    }
-                ]
-            });
-
-            const medidas = {};
-
-            for (const m of medidasDB) {
-
-                const nombre = m.TipoMedidaDetalle?.NombreTipoMedida;
-
-                if (!nombre) continue;
-
-                if (m.Valor !== null && m.Valor !== undefined) {
-                    medidas[nombre] = m.Valor;
-                }
-                else if (m.Descripcion !== null && m.Descripcion !== undefined) {
-                    medidas[nombre] = m.Descripcion;
-                }
-                else {
-                    medidas[nombre] = null;
-                }
-            }
-
-
-            // ===================== PRODUCTO =====================
-            productos.push({
-
-                CodigoProducto:
-                    det.Inventario?.Producto?.CodigoProducto || null,
-
-                NombreProducto:
-                    det.Inventario?.Producto?.NombreProducto || '',
-
-                CodigoTipoProducto:
-                    det.Inventario?.Producto?.TipoProducto?.CodigoTipoProducto || null,
-
-                NombreTipoProducto:
-                    det.Inventario?.Producto?.TipoProducto?.NombreTipoProducto || '',
-
-
-                // 🔥 TELA
-                CodigoTipoTela:
-                    det.CodigoTipoTela || null,
-
-                NombreTipoTela:
-                    det.TipoTela?.NombreTipoTela || '',
-
-                CodigoTela:
-                    det.CodigoTela || null,
-
-                NombreTela:
-                    det.Tela?.NombreTela || '',
-
-
-                // 🔥 CAMPOS
-                Codigo:
-                    det.Codigo || null,
-
-                Color:
-                    det.Color || '',
-
-                Referencia:
-                    det.Referencia || '',
-
-                Cantidad:
-                    det.Cantidad || 0,
-
-                Precio:
-                    det.PrecioVenta || 0,
-
-                Subtotal:
-                    det.Subtotal || 0,
-
-                Medidas: medidas
-            });
-        }
-
-
-        // ===================== PAGOS =====================
-        const totalAbonado =
-            pedido.PagosAplicados?.reduce(
-                (acc, pa) => acc + parseFloat(pa.MontoAplicado || 0),
-                0
-            ) || 0;
-
-        const saldoPendiente =
-            (pedido.Total || 0) - totalAbonado;
-
-
-        // ===================== RESPUESTA =====================
-        const respuesta = {
-
-            CodigoPedido: pedido.CodigoPedido,
-
-            CodigoCliente: pedido.CodigoCliente,
-            NombreCliente: pedido.CaCliente?.NombreCliente || '',
-
-            FechaEntrega: pedido.FechaEntrega,
-            CodigoEstadoPedido: pedido.CodigoEstadoPedido,
-            NombreEstadoPedido: pedido.CaEstadoPedido?.NombreEstadoPedido || '',
-
-            Descuento: pedido.Descuento || 0,
-            Subtotal: pedido.Subtotal || 0,
-            Total: pedido.Total || 0,
-
-            TotalAbonado: totalAbonado,
-            SaldoPendiente: saldoPendiente,
-
-            Pagos:
-                pedido.PagosAplicados?.map(pa => ({
-                    CodigoPagoAplicacion: pa.CodigoPagoAplicacion,
-                    CodigoPago: pa.CodigoPago,
-                    MontoAplicado: pa.MontoAplicado,
-                    FormaPago: pa.FnPago?.CodigoFormaPago,
-                    FechaPago: pa.FnPago?.FechaPago
-                })) || [],
-
-            Productos: productos
-        };
-
-        return respuesta;
-
-    } catch (error) {
-
-        console.error(
-            'Error original en ObtenerPedido:',
-            error
-        );
-
-        if (!error.statusCode)
-            LanzarError(
-                'Error al obtener pedido',
-                500,
-                'Error'
-            );
-
-        throw error;
-    }
-};
-
 
 
 const ListadoEntregados = async () => {
@@ -1731,5 +2023,5 @@ module.exports = {
     Listado, Obtener, ListadoTipoProducto, ListadoTipoTela,
     ListadoTela, ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido, ListadoTipoCuello,
     ObtenerPedido, ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido,
-    EliminarPedido, ListadoEstadoPedido, ListadoEntregados
+    EliminarPedido, ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido
 };

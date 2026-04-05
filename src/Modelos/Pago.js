@@ -27,6 +27,30 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.INTEGER,
       allowNull: false
     },
+    NumeroDocumento: {
+      type: DataTypes.STRING(50),
+      allowNull: true
+    },
+    SaldoAnterior: {
+      type: DataTypes.DECIMAL(12,2),
+      allowNull: false
+    },
+    SaldoPendiente: {
+      type: DataTypes.DECIMAL(12,2),
+      allowNull: false
+    },
+    Serie: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    TipoDocumento: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    Numero: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     FechaPago: {
       type: DataTypes.DATE,
       allowNull: false

@@ -4,6 +4,119 @@ const Servicio = require('../Servicios/HistorialPedidoServicio');
 const ManejarError = require('../Utilidades/ErrorControladores');
 const ResponderExito = require('../Utilidades/RespuestaExitosaControlador');
 
+const GenerarPDFPedido = async (req, res) => {
+    try {
+        const { CodigoPedido } = req.params;
+
+        await Servicio.GenerarPDFPedido(Number(CodigoPedido), res);
+
+        // No hace falta res.download ni retornar nada, el PDF ya se envía
+
+    } catch (error) {
+        return ManejarError(error, res, 'Error al generar el PDF del pedido');
+    }
+};
+const GenerarPDFPagoPedido = async (req, res) => {
+    try {
+
+        const { CodigoPedido } = req.params;
+
+        await Servicio.GenerarPDFPagoPedido(
+            Number(CodigoPedido),
+            res
+        );
+
+    } catch (error) {
+
+        return ManejarError(
+            error,
+            res,
+            'Error al generar el PDF de pago del pedido'
+        );
+    }
+};
+
+const CrearPedido = async (req, res) => {
+  try {
+
+    const datos = req.body;
+    const CodigoUsuario = req.Datos.CodigoUsuario;
+
+    const Objeto = await Servicio.CrearPedido(datos, CodigoUsuario);
+
+    return ResponderExito(
+      res,
+      'Pedido creado correctamente.',
+      Objeto || {}
+    );
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al crear el pedido'
+    );
+
+  }
+};
+
+const ObtenerPedido = async (req, res) => {
+  try {
+
+    const { CodigoPedido } = req.params;
+
+    if (!CodigoPedido) {
+      LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+    }
+
+    const Objeto = await Servicio.ObtenerPedido(CodigoPedido);
+
+    return ResponderExito(
+      res,
+      'Pedido obtenido correctamente.',
+      Objeto || {}
+    );
+
+  } catch (error) {
+    // 🔥 Manejo de error siguiendo el estándar
+    return ManejarError(
+      error,
+      res,
+      'Error al obtener el pedido'
+    );
+  }
+};
+
+const ActualizarPedido = async (req, res) => {
+  try {
+
+    const datos = req.body;
+
+    const CodigoUsuario = req.Datos.CodigoUsuario;
+
+    if (!datos.CodigoPedido) {
+      LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+    }
+
+    const Objeto = await Servicio.ActualizarPedido(datos, CodigoUsuario);
+
+    return ResponderExito(
+      res,
+      'Pedido actualizado correctamente.',
+      Objeto || {}
+    );
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al actualizar el pedido'
+    );
+
+  }
+};
 const EliminarPedido = async (req, res) => {
   try {
 
@@ -336,91 +449,11 @@ const ListadoFormaPago = async (req, res) => {
   }
 };
 
-const CrearPedido = async (req, res) => {
-  try {
 
-    const datos = req.body;
-    const CodigoUsuario = req.Datos.CodigoUsuario;
-
-    const Objeto = await Servicio.CrearPedido(datos, CodigoUsuario);
-
-    return ResponderExito(
-      res,
-      'Pedido creado correctamente.',
-      Objeto || {}
-    );
-
-  } catch (error) {
-
-    return ManejarError(
-      error,
-      res,
-      'Error al crear el pedido'
-    );
-
-  }
-};
-
-const ObtenerPedido = async (req, res) => {
-  try {
-
-    const { CodigoPedido } = req.params;
-
-    if (!CodigoPedido) {
-      LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
-    }
-
-    const Objeto = await Servicio.ObtenerPedido(CodigoPedido);
-
-    return ResponderExito(
-      res,
-      'Pedido obtenido correctamente.',
-      Objeto || {}
-    );
-
-  } catch (error) {
-    // 🔥 Manejo de error siguiendo el estándar
-    return ManejarError(
-      error,
-      res,
-      'Error al obtener el pedido'
-    );
-  }
-};
-
-const ActualizarPedido = async (req, res) => {
-  try {
-
-    const datos = req.body;
-
-    const CodigoUsuario = req.Datos.CodigoUsuario;
-
-    if (!datos.CodigoPedido) {
-      LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
-    }
-
-    const Objeto = await Servicio.ActualizarPedido(datos, CodigoUsuario);
-
-    return ResponderExito(
-      res,
-      'Pedido actualizado correctamente.',
-      Objeto || {}
-    );
-
-  } catch (error) {
-
-    return ManejarError(
-      error,
-      res,
-      'Error al actualizar el pedido'
-    );
-
-  }
-};
 
 module.exports = {
   Listado, Obtener, ListadoTipoProducto, ListadoTipoTela, ListadoTela, 
   ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido,ListadoTipoCuello, ObtenerPedido,
   ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido, EliminarPedido, 
-  ListadoEstadoPedido, ListadoEntregados
+  ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido
 };

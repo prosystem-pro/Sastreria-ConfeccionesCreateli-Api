@@ -6,7 +6,7 @@ const Tabla = 'HistorialPedido';
 const { Listado, Obtener, ListadoTipoProducto, ListadoTipoTela, ListadoTela, 
     ListadoProducto,ObtenerProducto,ListadoCliente, CrearPedido, ListadoTipoCuello, 
     ObtenerPedido,ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido, 
-    EliminarPedido, ListadoEstadoPedido, ListadoEntregados } = require('../Controladores/HistorialPedidoControlador');
+    EliminarPedido, ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido } = require('../Controladores/HistorialPedidoControlador');
 
 const VerificarToken = require('../FuncionIntermedia/VerificarToken');
 const VerificarPermisos = require('../FuncionIntermedia/VerificarPermisos');
@@ -29,5 +29,7 @@ Router.get(`/${Modelo}/pagos/:CodigoPedido`, VerificarToken, VerificarPermisos('
 Router.delete(`/${Modelo}/eliminar/:CodigoPedido`, VerificarToken, VerificarPermisos('EliminarPedido', Tabla), EliminarPedido);
 Router.get(`/${Modelo}/estado-pedido`, VerificarToken, VerificarPermisos('ListadoEstadoPedido', Tabla), ListadoEstadoPedido);
 Router.get(`/${Modelo}/entregados`, VerificarToken, VerificarPermisos('ListadoPedidoEntregado', Tabla), ListadoEntregados);
+Router.get(`/${Modelo}/pdf/:CodigoPedido`, VerificarToken, VerificarPermisos('PDFPedido', Tabla), GenerarPDFPedido);
+Router.get(`/${Modelo}/pdf-pago/:CodigoPedido`, VerificarToken, VerificarPermisos('PDFPagoPedido', Tabla), GenerarPDFPagoPedido);
 
 module.exports = Router;

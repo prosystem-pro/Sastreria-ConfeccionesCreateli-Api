@@ -13,7 +13,8 @@ module.exports = function(sequelize, DataTypes) {
       references: {
         model: 'Empresa',
         key: 'CodigoEmpresa'
-      }
+      },
+      unique: "Uq_Pedido_NumeroDocumento"
     },
     CodigoCliente: {
       type: DataTypes.INTEGER,
@@ -38,6 +39,24 @@ module.exports = function(sequelize, DataTypes) {
         model: 'Usuario',
         key: 'CodigoUsuario'
       }
+    },
+    NumeroDocumento: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      unique: "Uq_Pedido_NumeroDocumento"
+    },
+    Serie: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      unique: "Uq_Pedido_NumeroDocumento"
+    },
+    TipoDocumento: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    Numero: {
+      type: DataTypes.INTEGER,
+      allowNull: true
     },
     FechaCreacion: {
       type: DataTypes.DATE,
@@ -79,6 +98,15 @@ module.exports = function(sequelize, DataTypes) {
         unique: true,
         fields: [
           { name: "CodigoPedido" },
+        ]
+      },
+      {
+        name: "Uq_Pedido_NumeroDocumento",
+        unique: true,
+        fields: [
+          { name: "CodigoEmpresa" },
+          { name: "Serie" },
+          { name: "NumeroDocumento" },
         ]
       },
     ]

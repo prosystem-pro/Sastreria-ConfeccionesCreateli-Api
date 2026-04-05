@@ -43,6 +43,14 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    TipoDocumento: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    NumeroDocumento: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
     Cantidad: {
       type: DataTypes.INTEGER,
       allowNull: false
