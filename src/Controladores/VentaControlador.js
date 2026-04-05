@@ -3,18 +3,23 @@ const Servicio = require('../Servicios/VentaServicio');
 const ManejarError = require('../Utilidades/ErrorControladores');
 const ResponderExito = require('../Utilidades/RespuestaExitosaControlador');
 
-
-//LISTADOS
-const ListadoProducto = async (req, res) => {
+// =============================
+// OBTENER DATOS IMPRESION VENTA
+// =============================
+const ObtenerDatosImpresionVenta = async (req, res) => {
 
     try {
 
-        const Objeto = await Servicio.ListadoProducto();
+        const { CodigoPedido } = req.params;
+
+        const datos = await Servicio.ObtenerDatosImpresionVenta(
+            CodigoPedido
+        );
 
         return ResponderExito(
             res,
-            'Productos obtenidos correctamente.',
-            Objeto || []
+            datos,
+            'Datos de impresión obtenidos correctamente'
         );
 
     } catch (error) {
@@ -22,11 +27,33 @@ const ListadoProducto = async (req, res) => {
         return ManejarError(
             error,
             res,
-            'Error al obtener productos'
+            'Error al obtener datos de impresión de la venta'
+        );
+    }
+};
+
+// =============================
+// GENERAR PDF VENTA
+// =============================
+const GenerarPDFVenta = async (req, res) => {
+
+    try {
+
+        const { CodigoPedido } = req.params;
+
+        await Servicio.GenerarPDFVenta(
+            CodigoPedido,
+            res
         );
 
-    }
+    } catch (error) {
 
+        return ManejarError(
+            error,
+            res,
+            'Error al generar PDF de la venta'
+        );
+    }
 };
 
 // =============================
@@ -63,6 +90,30 @@ const CrearVenta = async (req, res) => {
 
 };
 
+//LISTADOS
+const ListadoProducto = async (req, res) => {
+
+    try {
+
+        const Objeto = await Servicio.ListadoProducto();
+
+        return ResponderExito(
+            res,
+            'Productos obtenidos correctamente.',
+            Objeto || []
+        );
+
+    } catch (error) {
+
+        return ManejarError(
+            error,
+            res,
+            'Error al obtener productos'
+        );
+
+    }
+
+};
 // =============================
 // LISTADO DE VENTAS
 // =============================
@@ -123,5 +174,5 @@ const EliminarVenta = async (req, res) => {
 };
 
 module.exports = {
-    ListadoProducto, CrearVenta, ListadoVentas, EliminarVenta
+    ListadoProducto, CrearVenta, ListadoVentas, EliminarVenta,GenerarPDFVenta, ObtenerDatosImpresionVenta
 };

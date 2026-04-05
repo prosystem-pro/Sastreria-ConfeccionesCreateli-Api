@@ -237,237 +237,7 @@ const CrearPedido = async (datos, usuario) => {
         throw error;
     }
 };
-const ObtenerPedido = async (CodigoPedido) => {
-    try {
 
-        if (!CodigoPedido)
-            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
-
-        // ===================== PEDIDO =====================
-        const pedido = await PedidoModelo.findOne({
-            where: {
-                CodigoPedido,
-                Estatus: 1
-            },
-            attributes: [
-                'CodigoPedido',
-                'CodigoCliente',
-                'CodigoUsuario',
-                'NumeroDocumento',
-                'FechaEntrega',
-                'CodigoEstadoPedido',
-                'Descuento',
-                'Subtotal',
-                'Total'
-            ],
-            include: [
-                {
-                    model: ClienteModelo,
-                    as: 'CaCliente',
-                    attributes: ['CodigoCliente', 'NombreCliente']
-                },
-                {
-                    model: UsuarioModelo,
-                    as: 'AdUsuario',
-                    attributes: ['CodigoUsuario', 'NombreUsuario']
-                },
-                {
-                    model: EstadoPedidoModelo,
-                    as: 'CaEstadoPedido',
-                    attributes: ['NombreEstadoPedido']
-                },
-                {
-                    model: PagoAplicacionModelo,
-                    as: 'PagosAplicados',
-                    attributes: [
-                        'CodigoPagoAplicacion',
-                        'CodigoPago',
-                        'MontoAplicado'
-                    ],
-                    include: [
-                        {
-                            model: PagoModelo,
-                            as: 'FnPago',
-                            attributes: [
-                                'CodigoFormaPago',
-                                'Monto',
-                                'FechaPago'
-                            ]
-                        }
-                    ]
-                }
-            ]
-        });
-
-        if (!pedido)
-            LanzarError('Pedido no encontrado', 404, 'Advertencia');
-
-
-        // ===================== DETALLES =====================
-        const detalles = await PedidoDetalleModelo.findAll({
-            where: {
-                CodigoPedido,
-                Estatus: 1
-            },
-            include: [
-                {
-                    model: InventarioModelo,
-                    as: 'Inventario',
-                    attributes: [
-                        'CodigoInventario',
-                        'CodigoProducto'
-                    ],
-                    include: [
-                        {
-                            model: ProductoModelo,
-                            as: 'Producto',
-                            attributes: [
-                                'CodigoProducto',
-                                'NombreProducto',
-                                'CodigoTipoProducto'
-                            ],
-                            include: [
-                                {
-                                    model: TipoProductoModelo,
-                                    as: 'TipoProducto',
-                                    attributes: [
-                                        'CodigoTipoProducto',
-                                        'NombreTipoProducto'
-                                    ],
-                                    required: false
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    model: TipoTelaModelo,
-                    as: 'TipoTela',
-                    attributes: [
-                        'CodigoTipoTela',
-                        'NombreTipoTela'
-                    ],
-                    required: false
-                },
-                {
-                    model: TelaModelo,
-                    as: 'Tela',
-                    attributes: [
-                        'CodigoTela',
-                        'NombreTela'
-                    ],
-                    required: false
-                }
-            ]
-        });
-
-
-        const productos = [];
-
-        for (const det of detalles) {
-
-            const medidasDB = await PedidoDetalleMedidaModelo.findAll({
-                where: {
-                    CodigoPedidoDetalle: det.CodigoPedidoDetalle
-                },
-                include: [
-                    {
-                        model: TipoMedidaModelo,
-                        as: 'TipoMedidaDetalle',
-                        attributes: ['NombreTipoMedida']
-                    }
-                ]
-            });
-
-            const medidas = {};
-
-            for (const m of medidasDB) {
-
-                const nombre = m.TipoMedidaDetalle?.NombreTipoMedida;
-                if (!nombre) continue;
-
-                if (m.Valor != null)
-                    medidas[nombre] = m.Valor;
-                else if (m.Descripcion != null)
-                    medidas[nombre] = m.Descripcion;
-                else
-                    medidas[nombre] = null;
-            }
-
-            productos.push({
-
-                CodigoProducto: det.Inventario?.Producto?.CodigoProducto || null,
-                NombreProducto: det.Inventario?.Producto?.NombreProducto || '',
-                CodigoTipoProducto: det.Inventario?.Producto?.TipoProducto?.CodigoTipoProducto || null,
-                NombreTipoProducto: det.Inventario?.Producto?.TipoProducto?.NombreTipoProducto || '',
-
-                CodigoTipoTela: det.CodigoTipoTela || null,
-                NombreTipoTela: det.TipoTela?.NombreTipoTela || '',
-
-                CodigoTela: det.CodigoTela || null,
-                NombreTela: det.Tela?.NombreTela || '',
-
-                Codigo: det.Codigo || null,
-                Color: det.Color || '',
-                Referencia: det.Referencia || '',
-
-                Cantidad: det.Cantidad || 0,
-                Precio: det.PrecioVenta || 0,
-                Subtotal: det.Subtotal || 0,
-
-                Medidas: medidas
-            });
-        }
-
-
-        // ===================== PAGOS =====================
-        const totalAbonado =
-            pedido.PagosAplicados?.reduce(
-                (acc, pa) => acc + parseFloat(pa.MontoAplicado || 0),
-                0
-            ) || 0;
-
-        const saldoPendiente =
-            (pedido.Total || 0) - totalAbonado;
-
-
-        // ===================== RESPUESTA =====================
-        return {
-
-            CodigoPedido: pedido.CodigoPedido,
-            NumeroDocumento: pedido.NumeroDocumento,
-
-            CodigoCliente: pedido.CodigoCliente,
-            NombreCliente: pedido.CaCliente?.NombreCliente || '',
-
-            CodigoUsuario: pedido.CodigoUsuario,
-            NombreUsuario: pedido.AdUsuario?.NombreUsuario || '',
-
-            FechaEntrega: pedido.FechaEntrega,
-            CodigoEstadoPedido: pedido.CodigoEstadoPedido,
-            NombreEstadoPedido: pedido.CaEstadoPedido?.NombreEstadoPedido || '',
-
-            Descuento: pedido.Descuento || 0,
-            Subtotal: pedido.Subtotal || 0,
-            Total: pedido.Total || 0,
-
-            TotalAbonado: totalAbonado,
-            SaldoPendiente: saldoPendiente,
-
-            Pagos: pedido.PagosAplicados || [],
-            Productos: productos
-        };
-
-    } catch (error) {
-
-        console.error('Error original en ObtenerPedido:', error);
-
-        if (!error.statusCode)
-            LanzarError('Error al obtener pedido', 500, 'Error');
-
-        throw error;
-    }
-};
 const GenerarPDFPedido = async (CodigoPedido, res) => {
     try {
 
@@ -1076,7 +846,237 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         throw error;
     }
 };
+const ObtenerPedido = async (CodigoPedido) => {
+    try {
 
+        if (!CodigoPedido)
+            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+
+        // ===================== PEDIDO =====================
+        const pedido = await PedidoModelo.findOne({
+            where: {
+                CodigoPedido,
+                Estatus: 1
+            },
+            attributes: [
+                'CodigoPedido',
+                'CodigoCliente',
+                'CodigoUsuario',
+                'NumeroDocumento',
+                'FechaEntrega',
+                'CodigoEstadoPedido',
+                'Descuento',
+                'Subtotal',
+                'Total'
+            ],
+            include: [
+                {
+                    model: ClienteModelo,
+                    as: 'CaCliente',
+                    attributes: ['CodigoCliente', 'NombreCliente']
+                },
+                {
+                    model: UsuarioModelo,
+                    as: 'AdUsuario',
+                    attributes: ['CodigoUsuario', 'NombreUsuario']
+                },
+                {
+                    model: EstadoPedidoModelo,
+                    as: 'CaEstadoPedido',
+                    attributes: ['NombreEstadoPedido']
+                },
+                {
+                    model: PagoAplicacionModelo,
+                    as: 'PagosAplicados',
+                    attributes: [
+                        'CodigoPagoAplicacion',
+                        'CodigoPago',
+                        'MontoAplicado'
+                    ],
+                    include: [
+                        {
+                            model: PagoModelo,
+                            as: 'FnPago',
+                            attributes: [
+                                'CodigoFormaPago',
+                                'Monto',
+                                'FechaPago'
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        if (!pedido)
+            LanzarError('Pedido no encontrado', 404, 'Advertencia');
+
+
+        // ===================== DETALLES =====================
+        const detalles = await PedidoDetalleModelo.findAll({
+            where: {
+                CodigoPedido,
+                Estatus: 1
+            },
+            include: [
+                {
+                    model: InventarioModelo,
+                    as: 'Inventario',
+                    attributes: [
+                        'CodigoInventario',
+                        'CodigoProducto'
+                    ],
+                    include: [
+                        {
+                            model: ProductoModelo,
+                            as: 'Producto',
+                            attributes: [
+                                'CodigoProducto',
+                                'NombreProducto',
+                                'CodigoTipoProducto'
+                            ],
+                            include: [
+                                {
+                                    model: TipoProductoModelo,
+                                    as: 'TipoProducto',
+                                    attributes: [
+                                        'CodigoTipoProducto',
+                                        'NombreTipoProducto'
+                                    ],
+                                    required: false
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    model: TipoTelaModelo,
+                    as: 'TipoTela',
+                    attributes: [
+                        'CodigoTipoTela',
+                        'NombreTipoTela'
+                    ],
+                    required: false
+                },
+                {
+                    model: TelaModelo,
+                    as: 'Tela',
+                    attributes: [
+                        'CodigoTela',
+                        'NombreTela'
+                    ],
+                    required: false
+                }
+            ]
+        });
+
+
+        const productos = [];
+
+        for (const det of detalles) {
+
+            const medidasDB = await PedidoDetalleMedidaModelo.findAll({
+                where: {
+                    CodigoPedidoDetalle: det.CodigoPedidoDetalle
+                },
+                include: [
+                    {
+                        model: TipoMedidaModelo,
+                        as: 'TipoMedidaDetalle',
+                        attributes: ['NombreTipoMedida']
+                    }
+                ]
+            });
+
+            const medidas = {};
+
+            for (const m of medidasDB) {
+
+                const nombre = m.TipoMedidaDetalle?.NombreTipoMedida;
+                if (!nombre) continue;
+
+                if (m.Valor != null)
+                    medidas[nombre] = m.Valor;
+                else if (m.Descripcion != null)
+                    medidas[nombre] = m.Descripcion;
+                else
+                    medidas[nombre] = null;
+            }
+
+            productos.push({
+
+                CodigoProducto: det.Inventario?.Producto?.CodigoProducto || null,
+                NombreProducto: det.Inventario?.Producto?.NombreProducto || '',
+                CodigoTipoProducto: det.Inventario?.Producto?.TipoProducto?.CodigoTipoProducto || null,
+                NombreTipoProducto: det.Inventario?.Producto?.TipoProducto?.NombreTipoProducto || '',
+
+                CodigoTipoTela: det.CodigoTipoTela || null,
+                NombreTipoTela: det.TipoTela?.NombreTipoTela || '',
+
+                CodigoTela: det.CodigoTela || null,
+                NombreTela: det.Tela?.NombreTela || '',
+
+                Codigo: det.Codigo || null,
+                Color: det.Color || '',
+                Referencia: det.Referencia || '',
+
+                Cantidad: det.Cantidad || 0,
+                Precio: det.PrecioVenta || 0,
+                Subtotal: det.Subtotal || 0,
+
+                Medidas: medidas
+            });
+        }
+
+
+        // ===================== PAGOS =====================
+        const totalAbonado =
+            pedido.PagosAplicados?.reduce(
+                (acc, pa) => acc + parseFloat(pa.MontoAplicado || 0),
+                0
+            ) || 0;
+
+        const saldoPendiente =
+            (pedido.Total || 0) - totalAbonado;
+
+
+        // ===================== RESPUESTA =====================
+        return {
+
+            CodigoPedido: pedido.CodigoPedido,
+            NumeroDocumento: pedido.NumeroDocumento,
+
+            CodigoCliente: pedido.CodigoCliente,
+            NombreCliente: pedido.CaCliente?.NombreCliente || '',
+
+            CodigoUsuario: pedido.CodigoUsuario,
+            NombreUsuario: pedido.AdUsuario?.NombreUsuario || '',
+
+            FechaEntrega: pedido.FechaEntrega,
+            CodigoEstadoPedido: pedido.CodigoEstadoPedido,
+            NombreEstadoPedido: pedido.CaEstadoPedido?.NombreEstadoPedido || '',
+
+            Descuento: pedido.Descuento || 0,
+            Subtotal: pedido.Subtotal || 0,
+            Total: pedido.Total || 0,
+
+            TotalAbonado: totalAbonado,
+            SaldoPendiente: saldoPendiente,
+
+            Pagos: pedido.PagosAplicados || [],
+            Productos: productos
+        };
+
+    } catch (error) {
+
+        console.error('Error original en ObtenerPedido:', error);
+
+        if (!error.statusCode)
+            LanzarError('Error al obtener pedido', 500, 'Error');
+
+        throw error;
+    }
+};
 const EliminarPedido = async (CodigoPedido) => {
 
     const transaccion = await BaseDatos.transaction();
