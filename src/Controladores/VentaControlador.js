@@ -7,23 +7,18 @@ const ResponderExito = require('../Utilidades/RespuestaExitosaControlador');
 // OBTENER DATOS IMPRESION VENTA
 // =============================
 const ObtenerDatosImpresionVenta = async (req, res) => {
-
     try {
-
         const { CodigoPedido } = req.params;
 
-        const datos = await Servicio.ObtenerDatosImpresionVenta(
-            CodigoPedido
-        );
+        const datos = await Servicio.ObtenerDatosImpresionVenta(CodigoPedido);
 
         return ResponderExito(
             res,
-            datos,
-            'Datos de impresión obtenidos correctamente'
+            'Datos de impresión obtenidos correctamente.',
+            datos || {}
         );
 
     } catch (error) {
-
         return ManejarError(
             error,
             res,

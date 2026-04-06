@@ -190,6 +190,396 @@ const ObtenerVenta = async (CodigoPedido) => {
         );
     }
 };
+
+const ObtenerDatosImpresionVenta = async (CodigoPedido) => {
+    try {
+        if (!CodigoPedido)
+            LanzarError('El código de venta es obligatorio', 400, 'Advertencia');
+
+        // ================= EMPRESA =================
+        const empresa = await EmpresaModelo.findOne({
+            where: { CodigoEmpresa: 1, Estatus: 1 }
+        });
+        if (!empresa) LanzarError('Empresa no encontrada', 404);
+
+        // ================= VENTA =================
+        const venta = await ObtenerVenta(Number(CodigoPedido));
+        if (!venta) LanzarError('Venta no encontrada', 404);
+
+        // ================= CLIENTE =================
+        const cliente = await ClienteModelo.findOne({
+            where: {
+                CodigoCliente: venta.CodigoCliente,
+                Estatus: 1
+            }
+        });
+        if (!cliente) LanzarError('Cliente no encontrado', 404);
+
+        // ================= FORMAS DE PAGO =================
+        const formasPagoDB = await FormaPago.findAll({
+            attributes: ['CodigoFormaPago', 'NombreFormaPago']
+        });
+        const mapaFormaPago = {};
+        formasPagoDB.forEach(f => {
+            mapaFormaPago[f.CodigoFormaPago] = f.NombreFormaPago;
+        });
+
+        // ================= PAGOS =================
+        const pagosDB = await PagoAplicacionModelo.findAll({
+            where: {
+                CodigoDocumento: CodigoPedido,
+                TipoDocumento: 'VENTA'
+            },
+            include: [
+                {
+                    model: PagoModelo,
+                    as: 'FnPago',
+                    where: { Estatus: 1 },
+                    required: false
+                }
+            ]
+        });
+
+        let tarjetaPago = null;
+        let otroPago = null;
+
+        pagosDB.forEach(p => {
+            const nombreFormaPago = mapaFormaPago[p.FnPago?.CodigoFormaPago] || 'Sin forma';
+            if (nombreFormaPago.toLowerCase().includes('tarjeta')) {
+                tarjetaPago = {
+                    nombre: nombreFormaPago,
+                    monto: Number(p.MontoAplicado || 0),
+                    numeroComprobante: p.FnPago?.NumeroComprobante || null
+                };
+            } else {
+                otroPago = {
+                    nombre: nombreFormaPago,
+                    monto: Number(p.MontoAplicado || 0)
+                };
+            }
+        });
+
+        const fechaVenta = new Date().toLocaleDateString();
+
+        // ================= RETORNAR DATOS PUROS =================
+        return {
+            empresa: {
+                nombre: empresa.NombreEmpresa,
+                nit: empresa.NIT,
+                direccion: empresa.Direccion,
+                telefono: empresa.Telefono,
+                logo: '/public/LogoConfeccionesCreateli.png'
+            },
+            cliente: {
+                nombre: cliente.NombreCliente,
+                nit: cliente.NIT || '',
+                direccion: cliente.Direccion || '',
+                celular: cliente.Celular || ''
+            },
+            venta: {
+                documento: venta.NumeroDocumento,
+                fecha: fechaVenta,
+                usuario: venta.NombreUsuario,
+                estado: 'VENTA'
+            },
+            productos: venta.Productos.map(p => ({
+                cantidad: p.Cantidad,
+                nombre: p.NombreProducto,
+                subtotal: p.Subtotal
+            })),
+            pago: tarjetaPago || otroPago,
+            referencia: tarjetaPago?.numeroComprobante || null,
+            totales: {
+                subtotal: venta.Subtotal,
+                descuento: venta.Descuento,
+                total: venta.Total
+            }
+        };
+
+    } catch (error) {
+        console.error(error);
+        LanzarError(
+            error.message || 'Error al obtener datos de impresión',
+            error.statusCode || 500,
+            'Error'
+        );
+    }
+};
+// CREAR VENTA (USANDO PEDIDO)
+const CrearVenta = async (datos, usuario) => {
+
+    let transaction;
+
+    try {
+
+        if (!usuario)
+            LanzarError('Usuario no autenticado', 401);
+
+        transaction = await BaseDatos.transaction();
+
+        const {
+            CodigoCliente,
+            CodigoFormaPago,
+            Descuento,
+            Pago,
+            Subtotal,
+            Total,
+            Productos,
+            NumeroComprobante
+        } = datos;
+
+        if (!CodigoCliente)
+            LanzarError('Cliente requerido', 400);
+
+        if (!CodigoFormaPago)
+            LanzarError('Forma de pago requerida', 400);
+
+        if (!Productos || Productos.length === 0)
+            LanzarError('Debe agregar productos', 400);
+
+        if (!Pago || Pago <= 0)
+            LanzarError('Pago inválido', 400);
+
+        const CodigoEmpresa = 1;
+
+        // ==============================
+        // GENERAR DOCUMENTO DE VENTA
+        // ==============================
+        const documentoVenta = await GenerarDocumento(
+            'VENTA',
+            CodigoEmpresa,
+            transaction
+        );
+
+        if (!documentoVenta)
+            LanzarError('No se pudo generar el documento de la venta', 500);
+
+
+        // ==============================
+        // OBTENER ESTADO VENDIDO
+        // ==============================
+        const estadoVenta = await EstadoPedidoModelo.findOne({
+            where: {
+                NombreEstadoPedido: 'VENDIDO',
+                Estatus: 1
+            },
+            transaction
+        });
+
+        if (!estadoVenta)
+            LanzarError('Estado VENDIDO no configurado', 400);
+
+
+        // ==============================
+        // CREAR VENTA (PEDIDO)
+        // ==============================
+        const venta = await PedidoModelo.create({
+
+            CodigoEmpresa,
+            CodigoCliente,
+            CodigoEstadoPedido: estadoVenta.CodigoEstadoPedido,
+            CodigoUsuario: usuario.CodigoUsuario,
+
+            Serie: documentoVenta.Serie,
+            TipoDocumento: documentoVenta.TipoDocumento,
+            NumeroDocumento: documentoVenta.NumeroDocumento,
+            Numero: documentoVenta.Numero,
+
+            FechaCreacion: new Date(),
+            FechaEntrega: new Date(),
+
+            Subtotal,
+            Descuento,
+            Total,
+
+            Observacion: 'Venta directa',
+            Estatus: 1
+
+        }, { transaction });
+
+        const CodigoPedido = venta.CodigoPedido;
+
+
+        // ==============================
+        // PRODUCTOS
+        // ==============================
+        for (const item of Productos) {
+
+            const inventario = await InventarioRelacion.findOne({
+                where: {
+                    CodigoInventario: item.CodigoInventario,
+                    Estatus: 1
+                },
+                transaction,
+                lock: transaction.LOCK.UPDATE
+            });
+
+            if (!inventario)
+                LanzarError(`Producto ${item.CodigoInventario} no existe`, 404);
+
+            if (inventario.StockActual < item.Cantidad)
+                LanzarError(
+                    `Stock insuficiente del producto ${item.CodigoInventario}`,
+                    400
+                );
+
+            const stockAnterior = inventario.StockActual;
+            const stockNuevo = stockAnterior - item.Cantidad;
+
+            // =============================
+            // DETALLE
+            // =============================
+            await PedidoDetalleModelo.create({
+
+                CodigoPedido,
+                CodigoInventario: item.CodigoInventario,
+                Cantidad: item.Cantidad,
+                PrecioVenta: item.PrecioVenta,
+                Subtotal: item.Total,
+                Estatus: 1
+
+            }, { transaction });
+
+            // =============================
+            // ACTUALIZAR STOCK
+            // =============================
+            await inventario.update({
+                StockActual: stockNuevo
+            }, { transaction });
+
+            // =============================
+            // MOVIMIENTO INVENTARIO
+            // =============================
+            await MovimientoInventarioModelo.create({
+
+                CodigoEmpresa,
+                CodigoInventario: item.CodigoInventario,
+                CodigoUsuario: usuario.CodigoUsuario,
+
+                TipoMovimiento: 'SALIDA',
+                OrigenMovimiento: 'VENTA',
+
+                TipoDocumento: documentoVenta.TipoDocumento,   // 🔴 DOCUMENTO DE VENTA
+                CodigoDocumento: CodigoPedido,
+                NumeroDocumento: documentoVenta.NumeroDocumento,
+
+                Cantidad: item.Cantidad,
+                StockAnterior: stockAnterior,
+                StockNuevo: stockNuevo,
+
+                FechaMovimiento: new Date(),
+                Observacion: `Salida por venta ${documentoVenta.NumeroDocumento}`,
+                Estatus: 1,
+                FechaCreacion: new Date()
+
+            }, { transaction });
+
+        }
+
+
+        // ==============================
+        // CALCULAR SALDOS
+        // ==============================
+        const saldoAnterior = 0;
+        const saldoPendiente = Total - Pago;
+
+
+        // ==============================
+        // GENERAR DOCUMENTO DE PAGO
+        // ==============================
+        const documentoPago = await GenerarDocumento(
+            'PAGO',
+            CodigoEmpresa,
+            transaction,
+            CodigoPedido
+        );
+
+        if (!documentoPago)
+            LanzarError('No se pudo generar el documento de pago', 500);
+
+
+        // ==============================
+        // CREAR PAGO
+        // ==============================
+        const pagoRegistro = await PagoModelo.create({
+
+            CodigoEmpresa,
+            CodigoFormaPago,
+            CodigoUsuario: usuario.CodigoUsuario,
+
+            Serie: documentoPago.Serie,
+            TipoDocumento: documentoPago.TipoDocumento,
+            NumeroDocumento: documentoPago.NumeroDocumento,
+            Numero: documentoPago.Numero,
+
+            FechaPago: new Date(),
+
+            SaldoAnterior: saldoAnterior,
+            SaldoPendiente: saldoPendiente,
+
+            Monto: Pago,
+            NumeroComprobante,
+
+            Observacion: 'Pago de venta',
+            Estatus: 1,
+            FechaCreacion: new Date()
+
+        }, { transaction });
+
+
+        // ==============================
+        // APLICAR PAGO A LA VENTA
+        // ==============================
+        await PagoAplicacionModelo.create({
+
+            CodigoPago: pagoRegistro.CodigoPago,
+
+            TipoDocumento: documentoVenta.TipoDocumento,  // 🔴 VENTA
+            CodigoDocumento: CodigoPedido,
+            NumeroDocumento: documentoVenta.NumeroDocumento,
+
+            MontoAplicado: Pago,
+            SaldoAnterior: saldoAnterior,
+            SaldoPendiente: saldoPendiente,
+
+            FechaCreacion: new Date()
+
+        }, { transaction });
+
+
+        // ==============================
+        // COMMIT
+        // ==============================
+        await transaction.commit();
+
+        return {
+
+            success: true,
+            message: 'Venta creada correctamente',
+
+            data: {
+                CodigoPedido,
+                NumeroDocumentoVenta: documentoVenta.NumeroDocumento,
+                NumeroDocumentoPago: documentoPago.NumeroDocumento
+            }
+
+        };
+
+    } catch (error) {
+
+        if (transaction)
+            await transaction.rollback();
+
+        console.error(error);
+
+        LanzarError(
+            error.message || 'Error al crear venta',
+            error.statusCode || 500,
+            'Error'
+        );
+    }
+};
+
 const GenerarPDFVenta = async (CodigoPedido, res) => {
 
     try {
@@ -524,433 +914,6 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
         );
     }
 };
-const ObtenerDatosImpresionVenta = async (CodigoPedido, res) => {
-
-    try {
-
-        if (!CodigoPedido)
-            LanzarError('El código de venta es obligatorio', 400, 'Advertencia');
-
-
-        // ================= EMPRESA =================
-        const empresa = await EmpresaModelo.findOne({
-            where: { CodigoEmpresa: 1, Estatus: 1 }
-        });
-
-        if (!empresa)
-            LanzarError('Empresa no encontrada', 404);
-
-
-        // ================= VENTA =================
-        const venta = await ObtenerVenta(Number(CodigoPedido));
-
-        if (!venta)
-            LanzarError('Venta no encontrada', 404);
-
-
-        // ================= CLIENTE =================
-        const cliente = await ClienteModelo.findOne({
-            where: {
-                CodigoCliente: venta.CodigoCliente,
-                Estatus: 1
-            }
-        });
-
-        if (!cliente)
-            LanzarError('Cliente no encontrado', 404);
-
-
-        // ================= FORMAS DE PAGO =================
-        const formasPagoDB = await FormaPago.findAll({
-            attributes: ['CodigoFormaPago', 'NombreFormaPago']
-        });
-
-        const mapaFormaPago = {};
-
-        formasPagoDB.forEach(f => {
-            mapaFormaPago[f.CodigoFormaPago] = f.NombreFormaPago;
-        });
-
-
-        // ================= PAGOS =================
-        const pagosDB = await PagoAplicacionModelo.findAll({
-
-            where: {
-                CodigoDocumento: CodigoPedido,
-                TipoDocumento: 'VENTA'
-            },
-
-            include: [
-                {
-                    model: PagoModelo,
-                    as: 'FnPago',
-                    where: { Estatus: 1 },
-                    required: false
-                }
-            ]
-        });
-
-
-        let tarjetaPago = null;
-        let otroPago = null;
-
-        pagosDB.forEach(p => {
-
-            const nombreFormaPago =
-                mapaFormaPago[p.FnPago?.CodigoFormaPago] || 'Sin forma';
-
-            if (nombreFormaPago.toLowerCase().includes('tarjeta')) {
-
-                tarjetaPago = {
-                    nombre: nombreFormaPago,
-                    monto: p.MontoAplicado,
-                    numeroComprobante: p.FnPago?.NumeroComprobante
-                };
-
-            } else {
-
-                otroPago = {
-                    nombre: nombreFormaPago,
-                    monto: p.MontoAplicado
-                };
-            }
-        });
-
-
-        // ================= FECHA =================
-        const fechaVenta = new Date().toLocaleDateString();
-
-
-        // ================= RESPUESTA =================
-        res.status(200).json({
-
-            empresa: {
-                nombre: empresa.NombreEmpresa,
-                nit: empresa.NIT,
-                direccion: empresa.Direccion,
-                telefono: empresa.Telefono,
-                logo: '/public/LogoConfeccionesCreateli.png'
-            },
-
-            cliente: {
-                nombre: cliente.NombreCliente,
-                nit: cliente.NIT || '',
-                direccion: cliente.Direccion || '',
-                celular: cliente.Celular || ''
-            },
-
-            venta: {
-                documento: venta.NumeroDocumento,
-                fecha: fechaVenta,
-                usuario: venta.NombreUsuario,
-                estado: 'VENTA'
-            },
-
-            productos: venta.Productos.map(p => ({
-                cantidad: p.Cantidad,
-                nombre: p.NombreProducto,
-                subtotal: p.Subtotal
-            })),
-
-            pago: tarjetaPago || otroPago,
-
-            referencia: tarjetaPago?.numeroComprobante || null,
-
-            totales: {
-                subtotal: venta.Subtotal,
-                descuento: venta.Descuento,
-                total: venta.Total
-            }
-
-        });
-
-    } catch (error) {
-
-        console.error(error);
-
-        LanzarError(
-            error.message || 'Error al obtener datos de impresión',
-            error.statusCode || 500,
-            'Error'
-        );
-    }
-};
-// CREAR VENTA (USANDO PEDIDO)
-const CrearVenta = async (datos, usuario) => {
-
-    let transaction;
-
-    try {
-
-        if (!usuario)
-            LanzarError('Usuario no autenticado', 401);
-
-        transaction = await BaseDatos.transaction();
-
-        const {
-            CodigoCliente,
-            CodigoFormaPago,
-            Descuento,
-            Pago,
-            Subtotal,
-            Total,
-            Productos,
-            NumeroComprobante
-        } = datos;
-
-        if (!CodigoCliente)
-            LanzarError('Cliente requerido', 400);
-
-        if (!CodigoFormaPago)
-            LanzarError('Forma de pago requerida', 400);
-
-        if (!Productos || Productos.length === 0)
-            LanzarError('Debe agregar productos', 400);
-
-        if (!Pago || Pago <= 0)
-            LanzarError('Pago inválido', 400);
-
-        const CodigoEmpresa = 1;
-
-        // ==============================
-        // GENERAR DOCUMENTO DE VENTA
-        // ==============================
-        const documentoVenta = await GenerarDocumento(
-            'VENTA',
-            CodigoEmpresa,
-            transaction
-        );
-
-        if (!documentoVenta)
-            LanzarError('No se pudo generar el documento de la venta', 500);
-
-
-        // ==============================
-        // OBTENER ESTADO VENDIDO
-        // ==============================
-        const estadoVenta = await EstadoPedidoModelo.findOne({
-            where: {
-                NombreEstadoPedido: 'VENDIDO',
-                Estatus: 1
-            },
-            transaction
-        });
-
-        if (!estadoVenta)
-            LanzarError('Estado VENDIDO no configurado', 400);
-
-
-        // ==============================
-        // CREAR VENTA (PEDIDO)
-        // ==============================
-        const venta = await PedidoModelo.create({
-
-            CodigoEmpresa,
-            CodigoCliente,
-            CodigoEstadoPedido: estadoVenta.CodigoEstadoPedido,
-            CodigoUsuario: usuario.CodigoUsuario,
-
-            Serie: documentoVenta.Serie,
-            TipoDocumento: documentoVenta.TipoDocumento,
-            NumeroDocumento: documentoVenta.NumeroDocumento,
-            Numero: documentoVenta.Numero,
-
-            FechaCreacion: new Date(),
-            FechaEntrega: new Date(),
-
-            Subtotal,
-            Descuento,
-            Total,
-
-            Observacion: 'Venta directa',
-            Estatus: 1
-
-        }, { transaction });
-
-        const CodigoPedido = venta.CodigoPedido;
-
-
-        // ==============================
-        // PRODUCTOS
-        // ==============================
-        for (const item of Productos) {
-
-            const inventario = await InventarioRelacion.findOne({
-                where: {
-                    CodigoInventario: item.CodigoInventario,
-                    Estatus: 1
-                },
-                transaction,
-                lock: transaction.LOCK.UPDATE
-            });
-
-            if (!inventario)
-                LanzarError(`Producto ${item.CodigoInventario} no existe`, 404);
-
-            if (inventario.StockActual < item.Cantidad)
-                LanzarError(
-                    `Stock insuficiente del producto ${item.CodigoInventario}`,
-                    400
-                );
-
-            const stockAnterior = inventario.StockActual;
-            const stockNuevo = stockAnterior - item.Cantidad;
-
-            // =============================
-            // DETALLE
-            // =============================
-            await PedidoDetalleModelo.create({
-
-                CodigoPedido,
-                CodigoInventario: item.CodigoInventario,
-                Cantidad: item.Cantidad,
-                PrecioVenta: item.PrecioVenta,
-                Subtotal: item.Total,
-                Estatus: 1
-
-            }, { transaction });
-
-            // =============================
-            // ACTUALIZAR STOCK
-            // =============================
-            await inventario.update({
-                StockActual: stockNuevo
-            }, { transaction });
-
-            // =============================
-            // MOVIMIENTO INVENTARIO
-            // =============================
-            await MovimientoInventarioModelo.create({
-
-                CodigoEmpresa,
-                CodigoInventario: item.CodigoInventario,
-                CodigoUsuario: usuario.CodigoUsuario,
-
-                TipoMovimiento: 'SALIDA',
-                OrigenMovimiento: 'VENTA',
-
-                TipoDocumento: documentoVenta.TipoDocumento,   // 🔴 DOCUMENTO DE VENTA
-                CodigoDocumento: CodigoPedido,
-                NumeroDocumento: documentoVenta.NumeroDocumento,
-
-                Cantidad: item.Cantidad,
-                StockAnterior: stockAnterior,
-                StockNuevo: stockNuevo,
-
-                FechaMovimiento: new Date(),
-                Observacion: `Salida por venta ${documentoVenta.NumeroDocumento}`,
-                Estatus: 1,
-                FechaCreacion: new Date()
-
-            }, { transaction });
-
-        }
-
-
-        // ==============================
-        // CALCULAR SALDOS
-        // ==============================
-        const saldoAnterior = 0;
-        const saldoPendiente = Total - Pago;
-
-
-        // ==============================
-        // GENERAR DOCUMENTO DE PAGO
-        // ==============================
-        const documentoPago = await GenerarDocumento(
-            'PAGO',
-            CodigoEmpresa,
-            transaction,
-            CodigoPedido
-        );
-
-        if (!documentoPago)
-            LanzarError('No se pudo generar el documento de pago', 500);
-
-
-        // ==============================
-        // CREAR PAGO
-        // ==============================
-        const pagoRegistro = await PagoModelo.create({
-
-            CodigoEmpresa,
-            CodigoFormaPago,
-            CodigoUsuario: usuario.CodigoUsuario,
-
-            Serie: documentoPago.Serie,
-            TipoDocumento: documentoPago.TipoDocumento,
-            NumeroDocumento: documentoPago.NumeroDocumento,
-            Numero: documentoPago.Numero,
-
-            FechaPago: new Date(),
-
-            SaldoAnterior: saldoAnterior,
-            SaldoPendiente: saldoPendiente,
-
-            Monto: Pago,
-            NumeroComprobante,
-
-            Observacion: 'Pago de venta',
-            Estatus: 1,
-            FechaCreacion: new Date()
-
-        }, { transaction });
-
-
-        // ==============================
-        // APLICAR PAGO A LA VENTA
-        // ==============================
-        await PagoAplicacionModelo.create({
-
-            CodigoPago: pagoRegistro.CodigoPago,
-
-            TipoDocumento: documentoVenta.TipoDocumento,  // 🔴 VENTA
-            CodigoDocumento: CodigoPedido,
-            NumeroDocumento: documentoVenta.NumeroDocumento,
-
-            MontoAplicado: Pago,
-            SaldoAnterior: saldoAnterior,
-            SaldoPendiente: saldoPendiente,
-
-            FechaCreacion: new Date()
-
-        }, { transaction });
-
-
-        // ==============================
-        // COMMIT
-        // ==============================
-        await transaction.commit();
-
-        return {
-
-            success: true,
-            message: 'Venta creada correctamente',
-
-            data: {
-                CodigoPedido,
-                NumeroDocumentoVenta: documentoVenta.NumeroDocumento,
-                NumeroDocumentoPago: documentoPago.NumeroDocumento
-            }
-
-        };
-
-    } catch (error) {
-
-        if (transaction)
-            await transaction.rollback();
-
-        console.error(error);
-
-        LanzarError(
-            error.message || 'Error al crear venta',
-            error.statusCode || 500,
-            'Error'
-        );
-    }
-};
-
-
 // ELIMINAR VENTA
 const EliminarVenta = async (CodigoPedido, usuario) => {
 
