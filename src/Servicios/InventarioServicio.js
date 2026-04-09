@@ -25,17 +25,14 @@ const {
 
 const ObtenerInventarioListado = async (CodigoEmpresa) => {
     try {
-
-        if (!CodigoEmpresa)
-            LanzarError('Empresa es requerida', 400);
+        if (!CodigoEmpresa) LanzarError('Empresa es requerida', 400);
 
         const Inventario = await InventarioRelacion.findAll({
-
             where: {
                 CodigoEmpresa,
-                Estatus: { [Op.in]: [1, 2] }
+                Estatus: { [Op.in]: [1, 2] },
+                StockActual: { [Op.gt]: 0 } // 🔹 Solo inventarios con stock
             },
-
             attributes: [
                 'CodigoInventario',
                 'CodigoBarras',
@@ -43,7 +40,6 @@ const ObtenerInventarioListado = async (CodigoEmpresa) => {
                 'StockActual',
                 'Estatus'
             ],
-
             include: [
                 {
                     model: ProductoRelacion,
@@ -54,9 +50,7 @@ const ObtenerInventarioListado = async (CodigoEmpresa) => {
                         'CodigoTipoProducto'
                     ],
                     required: true,
-                    where: {
-                        CodigoTipoProducto: 1   // 🔹 SOLO TIPO PRODUCTO 1
-                    },
+                    where: { CodigoTipoProducto: 1 }, // 🔹 Solo FISICO
                     include: [
                         {
                             model: TipoProductoRelacion,
@@ -69,66 +63,42 @@ const ObtenerInventarioListado = async (CodigoEmpresa) => {
                         }
                     ]
                 },
-
-                {
-                    model: MarcaRelacion,
-                    as: 'Marca',
-                    attributes: ['NombreMarca']
-                },
-
-                {
-                    model: EstiloRelacion,
-                    as: 'Estilo',
-                    attributes: ['NombreEstilo']
-                },
-
-                {
-                    model: TallaRelacion,
-                    as: 'Talla',
-                    attributes: ['NombreTalla']
-                },
-
-                {
-                    model: ColorRelacion,
-                    as: 'Color',
-                    attributes: ['NombreColor']
-                }
+                { model: MarcaRelacion, as: 'Marca', attributes: ['NombreMarca'] },
+                { model: EstiloRelacion, as: 'Estilo', attributes: ['NombreEstilo'] },
+                { model: TallaRelacion, as: 'Talla', attributes: ['NombreTalla'] },
+                { model: ColorRelacion, as: 'Color', attributes: ['NombreColor'] }
             ],
-
             order: [['CodigoInventario', 'DESC']]
         });
 
-        return Inventario.map(item => ({
 
+        // Mapeo
+        const resultado = Inventario.map(item => ({
             CodigoInventario: item.CodigoInventario,
-
             Producto: item.Producto?.NombreProducto || 'Sin producto',
-
             TipoProducto: item.Producto?.TipoProducto?.NombreTipoProducto || 'Sin tipo',
-
             CodigoBarra: item.CodigoBarras,
-
             Marca: item.Marca?.NombreMarca || 'Sin marca',
-
             Diseno: item.Estilo?.NombreEstilo || 'Sin estilo',
-
             Talla: item.Talla?.NombreTalla || 'Sin talla',
-
             Color: item.Color?.NombreColor || 'Sin color',
-
             PrecioVenta: item.PrecioVenta,
-
             StockActual: item.StockActual,
-
             Estatus: item.Estatus
-
         }));
 
-    } catch (error) {
+        // 🔹 Eliminar duplicados por Producto
+        const resultadoUnico = resultado.reduce((acc, current) => {
+            if (!acc.find(x => x.Producto === current.Producto)) acc.push(current);
+            return acc;
+        }, []);
 
+
+        return resultadoUnico;
+
+    } catch (error) {
         console.error('Error en ObtenerInventarioListado:', error);
         throw error;
-
     }
 };
 const CrearProductoInventario = async (Datos, CodigoUsuario) => {

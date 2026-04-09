@@ -1174,7 +1174,8 @@ const ListadoProducto = async () => {
 
             attributes: [
                 'CodigoInventario',
-                'PrecioVenta'   // ✅ precio que se enviará
+                'CodigoBarras',  
+                'PrecioVenta'
             ],
 
             include: [
@@ -1184,7 +1185,7 @@ const ListadoProducto = async () => {
                     attributes: [
                         'CodigoProducto',
                         'NombreProducto',
-                        'PrecioBase'   // opcional, solo referencia
+                        'PrecioBase'
                     ]
                 }
             ],
@@ -1198,11 +1199,13 @@ const ListadoProducto = async () => {
         return productos.map(p => ({
 
             CodigoInventario: p.CodigoInventario,
+            CodigoBarras: p.CodigoBarras,  // ✅ se envía
+
             CodigoProducto: p.Producto?.CodigoProducto,
             NombreProducto: p.Producto?.NombreProducto,
 
-            PrecioVenta: p.PrecioVenta,        // ✅ precio real de venta
-            PrecioBase: p.Producto?.PrecioBase // opcional
+            PrecioVenta: p.PrecioVenta,
+            PrecioBase: p.Producto?.PrecioBase
 
         }));
 
