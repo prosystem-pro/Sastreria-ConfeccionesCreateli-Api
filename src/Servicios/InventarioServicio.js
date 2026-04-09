@@ -25,61 +25,110 @@ const {
 
 const ObtenerInventarioListado = async (CodigoEmpresa) => {
     try {
-        if (!CodigoEmpresa) LanzarError('Empresa es requerida', 400);
+
+        if (!CodigoEmpresa)
+            LanzarError('Empresa es requerida', 400);
 
         const Inventario = await InventarioRelacion.findAll({
+
             where: {
                 CodigoEmpresa,
-                Estatus: { [Op.in]: [1, 2] } // Solo registros activos e inactivos
+                Estatus: { [Op.in]: [1, 2] }
             },
+
             attributes: [
                 'CodigoInventario',
                 'CodigoBarras',
                 'PrecioVenta',
                 'StockActual',
-                'Estatus' // <-- Asegúrate de incluirlo aquí
+                'Estatus'
             ],
+
             include: [
                 {
                     model: ProductoRelacion,
                     as: 'Producto',
-                    attributes: ['CodigoProducto', 'NombreProducto'],
+                    attributes: [
+                        'CodigoProducto',
+                        'NombreProducto',
+                        'CodigoTipoProducto'
+                    ],
                     required: true,
+                    where: {
+                        CodigoTipoProducto: 1   // 🔹 SOLO TIPO PRODUCTO 1
+                    },
                     include: [
                         {
                             model: TipoProductoRelacion,
                             as: 'TipoProducto',
-                            attributes: ['NombreTipoProducto'],
-                            required: true,
-                            where: { NombreTipoProducto: 'FISICO' }
+                            attributes: [
+                                'CodigoTipoProducto',
+                                'NombreTipoProducto'
+                            ],
+                            required: true
                         }
                     ]
                 },
-                { model: MarcaRelacion, as: 'Marca', attributes: ['NombreMarca'] },
-                { model: EstiloRelacion, as: 'Estilo', attributes: ['NombreEstilo'] },
-                { model: TallaRelacion, as: 'Talla', attributes: ['NombreTalla'] },
-                { model: ColorRelacion, as: 'Color', attributes: ['NombreColor'] }
+
+                {
+                    model: MarcaRelacion,
+                    as: 'Marca',
+                    attributes: ['NombreMarca']
+                },
+
+                {
+                    model: EstiloRelacion,
+                    as: 'Estilo',
+                    attributes: ['NombreEstilo']
+                },
+
+                {
+                    model: TallaRelacion,
+                    as: 'Talla',
+                    attributes: ['NombreTalla']
+                },
+
+                {
+                    model: ColorRelacion,
+                    as: 'Color',
+                    attributes: ['NombreColor']
+                }
             ],
+
             order: [['CodigoInventario', 'DESC']]
         });
 
         return Inventario.map(item => ({
+
             CodigoInventario: item.CodigoInventario,
+
             Producto: item.Producto?.NombreProducto || 'Sin producto',
+
             TipoProducto: item.Producto?.TipoProducto?.NombreTipoProducto || 'Sin tipo',
+
             CodigoBarra: item.CodigoBarras,
+
             Marca: item.Marca?.NombreMarca || 'Sin marca',
+
             Diseno: item.Estilo?.NombreEstilo || 'Sin estilo',
+
             Talla: item.Talla?.NombreTalla || 'Sin talla',
+
             Color: item.Color?.NombreColor || 'Sin color',
+
             PrecioVenta: item.PrecioVenta,
+
             StockActual: item.StockActual,
-            Estatus: item.Estatus // <-- Ahora sí lo tendrás en Angular
+
+            Estatus: item.Estatus
+
         }));
 
     } catch (error) {
+
         console.error('Error en ObtenerInventarioListado:', error);
         throw error;
+
     }
 };
 const CrearProductoInventario = async (Datos, CodigoUsuario) => {
@@ -442,66 +491,96 @@ const EliminarInventario = async (CodigoInventario, CodigoUsuario) => {
 
 const ObtenerInventarioEliminados = async (CodigoEmpresa) => {
     try {
-        if (!CodigoEmpresa) LanzarError('Empresa es requerida', 400);
+
+        if (!CodigoEmpresa)
+            LanzarError('Empresa es requerida', 400);
 
         const Inventario = await InventarioRelacion.findAll({
+
             where: {
                 CodigoEmpresa,
-                Estatus: 3  // 🔹 Solo eliminados
+                Estatus: 3   // 🔹 solo eliminados
             },
+
             attributes: [
                 'CodigoInventario',
                 'CodigoBarras',
                 'PrecioVenta',
                 'StockActual'
             ],
+
             include: [
                 {
                     model: ProductoRelacion,
                     as: 'Producto',
-                    attributes: ['NombreProducto']
+                    attributes: [
+                        'CodigoProducto',
+                        'NombreProducto',
+                        'CodigoTipoProducto'
+                    ],
+                    required: true,
+                    where: {
+                        CodigoTipoProducto: 1   // 🔹 SOLO TIPO PRODUCTO 1
+                    }
                 },
+
                 {
                     model: MarcaRelacion,
                     as: 'Marca',
                     attributes: ['NombreMarca']
                 },
+
                 {
                     model: EstiloRelacion,
                     as: 'Estilo',
                     attributes: ['NombreEstilo']
                 },
+
                 {
                     model: TallaRelacion,
                     as: 'Talla',
                     attributes: ['NombreTalla']
                 },
+
                 {
                     model: ColorRelacion,
                     as: 'Color',
                     attributes: ['NombreColor']
                 }
             ],
+
             order: [['CodigoInventario', 'DESC']]
         });
 
         return Inventario.map(item => ({
+
             CodigoInventario: item.CodigoInventario,
-            Producto: item.Producto?.NombreProducto,
+
+            Producto: item.Producto?.NombreProducto || 'Sin producto',
+
             CodigoBarra: item.CodigoBarras,
-            Marca: item.Marca?.NombreMarca,
-            Diseno: item.Estilo?.NombreEstilo,
-            Talla: item.Talla?.NombreTalla,
-            Color: item.Color?.NombreColor,
+
+            Marca: item.Marca?.NombreMarca || 'Sin marca',
+
+            Diseno: item.Estilo?.NombreEstilo || 'Sin estilo',
+
+            Talla: item.Talla?.NombreTalla || 'Sin talla',
+
+            Color: item.Color?.NombreColor || 'Sin color',
+
             PrecioVenta: item.PrecioVenta,
+
             StockActual: item.StockActual
+
         }));
 
     } catch (error) {
+
+        console.error('Error en ObtenerInventarioEliminados:', error);
         throw error;
+
     }
 };
-
 const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuario) => {
 
     const Transaccion = await BaseDatos.transaction();

@@ -118,6 +118,8 @@ function initModels(sequelize) {
   Talla.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoTalla"});
   Inventario.belongsTo(Tamano, { as: "CodigoTamano_Tamano", foreignKey: "CodigoTamano"});
   Tamano.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoTamano"});
+  Inventario.belongsTo(Tela, { as: "CodigoTela_Tela", foreignKey: "CodigoTela"});
+  Tela.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoTela"});
   PedidoDetalle.belongsTo(Tela, { as: "CodigoTela_Tela", foreignKey: "CodigoTela"});
   Tela.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoTela"});
   PedidoDetalle.belongsTo(TipoCorte, { as: "CodigoTipoCorte_TipoCorte", foreignKey: "CodigoTipoCorte"});
@@ -134,6 +136,8 @@ function initModels(sequelize) {
   TipoSolapa.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoTipoSolapa"});
   Tela.belongsTo(TipoTela, { as: "CodigoTipoTela_TipoTela", foreignKey: "CodigoTipoTela"});
   TipoTela.hasMany(Tela, { as: "Telas", foreignKey: "CodigoTipoTela"});
+  Inventario.belongsTo(TipoTela, { as: "CodigoTipoTela_TipoTela", foreignKey: "CodigoTipoTela"});
+  TipoTela.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoTipoTela"});
   PedidoDetalle.belongsTo(TipoTela, { as: "CodigoTipoTela_TipoTela", foreignKey: "CodigoTipoTela"});
   TipoTela.hasMany(PedidoDetalle, { as: "PedidoDetalles", foreignKey: "CodigoTipoTela"});
   PagoAplicacion.belongsTo(Pago, { as: "CodigoPago_Pago", foreignKey: "CodigoPago"});

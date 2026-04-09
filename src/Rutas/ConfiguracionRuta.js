@@ -7,7 +7,8 @@ const Tabla = 'Configuracion';
 const { CrearProductoInventario, ObtenerInventarioListado, ObtenerInventarioEliminados,
     EliminarInventario, RestaurarInventario, ActualizarProductoInventario,
     ObtenerInventarioPorCodigo, ListadoTipoTela, ListadoTela, CrearTipoTela, EditarTipoTela,
-    ObtenerTipoTelaPorCodigo, CrearTela, EditarTela, ObtenerTelaPorCodigo,EliminarTipoTela, EliminarTela } = require('../Controladores/ConfiguracionControlador');
+    ObtenerTipoTelaPorCodigo, CrearTela, EditarTela, ObtenerTelaPorCodigo, EliminarTipoTela, EliminarTela,ListadoProducto,
+    CrearVariacionInventario, ListadoTelaCompleto } = require('../Controladores/ConfiguracionControlador');
 
 const VerificarToken = require('../FuncionIntermedia/VerificarToken');
 const VerificarPermisos = require('../FuncionIntermedia/VerificarPermisos');
@@ -22,8 +23,8 @@ Router.post(`/${Modelo}/restaurar`, VerificarToken, VerificarPermisos('Editar', 
 Router.put(`/${Modelo}/actualizar/:CodigoInventario`, VerificarToken, VerificarPermisos('Editar', Tabla), ActualizarProductoInventario);
 Router.get(`/${Modelo}/obtener/:CodigoInventario`, VerificarToken, VerificarPermisos('Ver', Tabla), ObtenerInventarioPorCodigo);
 Router.get(`/${Modelo}/listado-tipo-tela`, VerificarToken, VerificarPermisos('Ver', Tabla), ListadoTipoTela);
-Router.get(`/${Modelo}/listado-tela`, VerificarToken, VerificarPermisos('Ver', Tabla), ListadoTela);
-
+Router.get(`/${Modelo}/listado-tela/:CodigoTipoTela`, VerificarToken, VerificarPermisos('Ver', Tabla), ListadoTela);
+Router.post(`/${Modelo}/crear-variacion`, VerificarToken, VerificarPermisos('Crear', Tabla), CrearVariacionInventario);
 Router.post(`/${Modelo}/crear-tipo-tela`, VerificarToken, VerificarPermisos('Crear', Tabla), CrearTipoTela);
 Router.put(`/${Modelo}/editar-tipo-tela/:codigo`, VerificarToken, VerificarPermisos('Editar', Tabla), EditarTipoTela);
 Router.get(`/${Modelo}/obtener-tipo-tela/:codigo`, VerificarToken, VerificarPermisos('Ver', Tabla), ObtenerTipoTelaPorCodigo);
@@ -32,5 +33,6 @@ Router.put(`/${Modelo}/editar-tela/:codigo`, VerificarToken, VerificarPermisos('
 Router.get(`/${Modelo}/obtener-tela/:codigo`, VerificarToken, VerificarPermisos('Ver', Tabla), ObtenerTelaPorCodigo);
 Router.delete(`/${Modelo}/eliminar-tipo-tela/:codigo`, VerificarToken, VerificarPermisos('Eliminar', Tabla), EliminarTipoTela);
 Router.delete(`/${Modelo}/eliminar-tela/:codigo`, VerificarToken, VerificarPermisos('Eliminar', Tabla), EliminarTela);
-
+Router.get(`/${Modelo}/listado-producto`, VerificarToken, VerificarPermisos('Ver', Tabla), ListadoProducto);
+Router.get( `/${Modelo}/listado-tela-completo`, VerificarToken, VerificarPermisos('Ver', Tabla), ListadoTelaCompleto);
 module.exports = Router;

@@ -57,6 +57,9 @@ InventarioModelo.belongsTo(MarcaModelo, { foreignKey: 'CodigoMarca', as: 'Marca'
 InventarioModelo.belongsTo(EstiloModelo, { foreignKey: 'CodigoEstilo', as: 'Estilo' }); EstiloModelo.hasMany(InventarioModelo, { foreignKey: 'CodigoEstilo', as: 'Inventarios' });
 InventarioModelo.belongsTo(TallaModelo, { foreignKey: 'CodigoTalla', as: 'Talla' }); TallaModelo.hasMany(InventarioModelo, { foreignKey: 'CodigoTalla', as: 'Inventarios' });
 InventarioModelo.belongsTo(ColorModelo, { foreignKey: 'CodigoColor', as: 'Color' }); ColorModelo.hasMany(InventarioModelo, { foreignKey: 'CodigoColor', as: 'Inventarios' });
+// Inventario - TipoTela / Tela
+InventarioModelo.belongsTo(TipoTelaModelo, { foreignKey: 'CodigoTipoTela', as: 'TipoTela' }); TipoTelaModelo.hasMany(InventarioModelo, { foreignKey: 'CodigoTipoTela', as: 'Inventarios' });
+InventarioModelo.belongsTo(TelaModelo, { foreignKey: 'CodigoTela', as: 'Tela' }); TelaModelo.hasMany(InventarioModelo, { foreignKey: 'CodigoTela', as: 'Inventarios' });
 // PedidoDetalle - TipoTela / Tela
 PedidoDetalleModelo.belongsTo(TipoTelaModelo, { foreignKey: 'CodigoTipoTela', as: 'TipoTela' }); TipoTelaModelo.hasMany(PedidoDetalleModelo, { foreignKey: 'CodigoTipoTela', as: 'PedidoDetalles' });
 PedidoDetalleModelo.belongsTo(TelaModelo, { foreignKey: 'CodigoTela', as: 'Tela' }); TelaModelo.hasMany(PedidoDetalleModelo, { foreignKey: 'CodigoTela', as: 'PedidoDetalles' });

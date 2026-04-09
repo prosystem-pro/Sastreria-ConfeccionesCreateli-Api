@@ -57,6 +57,35 @@ const CrearProductoInventario = async (req, res) => {
 
     }
 };
+
+// CONTROLADOR: CrearVariación en Inventario
+const CrearVariacionInventario = async (req, res) => {
+    try {
+        const datos = req.body;
+        const CodigoUsuario = req.Datos.CodigoUsuario;
+
+        // Llamamos al servicio que solo crea la variación en inventario
+        const inventarioCreado = await Servicio.CrearVariacionInventario(
+            datos,
+            CodigoUsuario
+        );
+
+        return ResponderExito(
+            res,
+            'Variación agregada al inventario correctamente.',
+            inventarioCreado || {},
+            201
+        );
+
+    } catch (error) {
+        return ManejarError(
+            error,
+            res,
+            'Error al agregar variación al inventario'
+        );
+    }
+};
+
 const ObtenerInventarioPorCodigo = async (req, res) => {
     try {
         const { CodigoInventario } = req.params; // O req.body si prefieres enviar por POST
@@ -165,6 +194,29 @@ const ActualizarProductoInventario = async (req, res) => {
     }
 };
 //LISTADOS
+const ListadoProducto = async (req, res) => {
+
+    try {
+
+        const Objeto = await Servicio.ListadoProducto();
+
+        return ResponderExito(
+            res,
+            'Productos obtenidos correctamente.',
+            Objeto || []
+        );
+
+    } catch (error) {
+
+        return ManejarError(
+            error,
+            res,
+            'Error al obtener productos'
+        );
+
+    }
+
+};
 const ListadoTipoTela = async (req, res) => {
 
     try {
@@ -190,10 +242,18 @@ const ListadoTipoTela = async (req, res) => {
 };
 
 const ListadoTela = async (req, res) => {
-
     try {
 
-        const Objeto = await Servicio.ListadoNombreTela();
+        const { CodigoTipoTela } = req.params;
+
+        if (!CodigoTipoTela)
+            return ResponderError(
+                res,
+                'CodigoTipoTela es requerido',
+                400
+            );
+
+        const Objeto = await Servicio.ListadoNombreTela(CodigoTipoTela);
 
         return ResponderExito(
             res,
@@ -210,7 +270,27 @@ const ListadoTela = async (req, res) => {
         );
 
     }
+};
+const ListadoTelaCompleto = async (req, res) => {
+    try {
 
+        const Objeto = await Servicio.ListadoNombreTelaCompleto();
+
+        return ResponderExito(
+            res,
+            'Listado de telas obtenido correctamente.',
+            Objeto || []
+        );
+
+    } catch (error) {
+
+        return ManejarError(
+            error,
+            res,
+            'Error al obtener listado de telas'
+        );
+
+    }
 };
 // =============================
 // CREAR
@@ -445,6 +525,6 @@ module.exports = {
     CrearTela,
     ObtenerTipoTelaPorCodigo,
     ObtenerTelaPorCodigo,
-    EditarTipoTela,
-    EditarTela, EliminarTipoTela, EliminarTela
+    EditarTipoTela, ListadoTelaCompleto,
+    EditarTela, EliminarTipoTela, EliminarTela, CrearVariacionInventario, ListadoProducto
 };

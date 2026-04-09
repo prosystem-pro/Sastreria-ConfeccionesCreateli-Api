@@ -22,7 +22,688 @@ const {
     TipoTelaModelo: TipoTelaRelacion,
     TelaModelo: TelaRelacion
 } = require('../Relaciones/Relaciones');
-// LISTADOS
+
+const ListadoNombreTelaCompleto = async () => {
+    try {
+
+        const telas = await TelaRelacion.findAll({
+
+            where: { Estatus: 1 },
+
+            attributes: [
+                'CodigoTela',
+                'NombreTela',
+                'CodigoTipoTela'
+            ],
+
+            include: [
+                {
+                    model: TipoTelaRelacion,
+                    as: 'TipoTela',
+                    attributes: ['NombreTipoTela'],
+                    required: true
+                }
+            ],
+
+            order: [['NombreTela', 'ASC']]
+
+        });
+
+        return telas.map(t => ({
+
+            CodigoTela: t.CodigoTela,
+            CodigoTipoTela: t.CodigoTipoTela,
+            NombreTipoTela: t.TipoTela?.NombreTipoTela || '',
+            NombreTela: t.NombreTela
+
+        }));
+
+    } catch (error) {
+
+        console.error(error);
+
+        LanzarError(
+            'Error al obtener listado de telas',
+            500,
+            'Error'
+        );
+    }
+};
+const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuario) => {
+
+    const Transaccion = await BaseDatos.transaction();
+
+    try {
+
+        const {
+            CodigoProducto,
+            CodigoTipoProducto,
+            CodigoTipoTela,
+            CodigoTela,
+            Precio,
+            Stock,
+            Estatus
+        } = Datos;
+
+        if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
+        if (!CodigoProducto) LanzarError('Producto es requerido', 400);
+        if (!CodigoTipoProducto) LanzarError('Tipo de producto es requerido', 400);
+        if (!CodigoTipoTela) LanzarError('Tipo de tela es requerido', 400);
+        if (!CodigoTela) LanzarError('Tela es requerida', 400);
+        if (Precio === undefined || Precio === null) LanzarError('Precio es requerido', 400);
+        if (Stock === undefined || Stock === null) LanzarError('Stock es requerido', 400);
+        if (Estatus === undefined || Estatus === null) LanzarError('Estatus es requerido', 400);
+        if (!CodigoUsuario) LanzarError('Usuario es requerido', 400);
+
+        const CodigoEmpresa = 1;
+
+        // =========================
+        // 1. BUSCAR INVENTARIO
+        // =========================
+        const InventarioDB = await InventarioRelacion.findOne({
+            where: {
+                CodigoInventario,
+                CodigoEmpresa
+            },
+            transaction: Transaccion
+        });
+
+        if (!InventarioDB)
+            LanzarError('Inventario no encontrado', 404);
+
+        // =========================
+        // 2. VALIDAR DUPLICADO
+        // =========================
+        const ExisteOtroInventario = await InventarioRelacion.findOne({
+            where: {
+                CodigoEmpresa,
+                CodigoProducto,
+                CodigoTipoTela,
+                CodigoTela,
+                CodigoInventario: { [Op.ne]: CodigoInventario }
+            },
+            transaction: Transaccion
+        });
+
+        if (ExisteOtroInventario)
+            LanzarError('Otro inventario ya existe con la misma combinación', 400);
+
+        // =========================
+        // 3. ACTUALIZAR INVENTARIO
+        // =========================
+        const StockAnterior = InventarioDB.StockActual;
+
+        await InventarioDB.update({
+            CodigoProducto,
+            CodigoTipoProducto,
+            CodigoTipoTela,
+            CodigoTela,
+            PrecioVenta: Precio,
+            StockActual: Stock,
+            Estatus
+        }, { transaction: Transaccion });
+
+        // =========================
+        // 4. MOVIMIENTO INVENTARIO
+        // =========================
+        if (StockAnterior !== Stock) {
+
+            await MovimientoInventarioModelo.create({
+                CodigoEmpresa,
+                CodigoInventario: CodigoInventario,
+                TipoMovimiento: 'AJUSTE',
+                OrigenMovimiento: 'ACTUALIZACION',
+                CodigoDocumento: null,
+                Cantidad: Stock,
+                StockAnterior,
+                StockNuevo: Stock,
+                Observacion: 'Actualización de inventario',
+                CodigoUsuario,
+                FechaMovimiento: new Date()
+            }, { transaction: Transaccion });
+
+        }
+
+        await Transaccion.commit();
+
+        return InventarioDB;
+
+    } catch (error) {
+
+        await Transaccion.rollback();
+        throw error;
+
+    }
+
+};
+
+const CrearProductoInventario = async (Datos, CodigoUsuario) => {
+    console.log('Ira', Datos)
+    const Transaccion = await BaseDatos.transaction();
+
+    try {
+
+        const {
+            CodigoTipoProducto,
+            CodigoTipoTela,
+            CodigoTela,
+            NombreProducto,
+            Precio
+        } = Datos;
+
+        // EMPRESA QUEMADA
+        const CodigoEmpresa = 1;
+
+        // =========================
+        // VALIDACIONES
+        // =========================
+
+        if (!CodigoTipoProducto)
+            LanzarError('Tipo de producto es requerido', 400);
+
+        if (!CodigoTipoTela)
+            LanzarError('Tipo de tela es requerido', 400);
+
+        if (!CodigoTela)
+            LanzarError('Tela es requerida', 400);
+
+        if (!NombreProducto)
+            LanzarError('Nombre de producto es requerido', 400);
+
+        if (Precio === undefined || Precio === null)
+            LanzarError('Precio es requerido', 400);
+
+        if (!CodigoUsuario)
+            LanzarError('Usuario es requerido', 400);
+
+        // =========================
+        // VALIDAR PRODUCTO DUPLICADO
+        // =========================
+
+        const ExisteProducto = await ProductoModelo.findOne({
+            where: {
+                NombreProducto,
+                CodigoEmpresa
+            },
+            transaction: Transaccion
+        });
+
+        if (ExisteProducto)
+            LanzarError('El producto ya existe', 400);
+
+        // =========================
+        // 1. CREAR PRODUCTO
+        // =========================
+
+        const ProductoDB = await ProductoModelo.create({
+            CodigoEmpresa,
+            CodigoTipoProducto,
+            NombreProducto,
+            PrecioBase: Precio,
+            Estatus: 1
+        }, { transaction: Transaccion });
+
+        // =========================
+        // 2. CREAR INVENTARIO
+        // =========================
+
+        const InventarioDB = await InventarioModelo.create({
+
+            CodigoEmpresa,
+            CodigoProducto: ProductoDB.CodigoProducto,
+            CodigoTipoTela,
+            CodigoTela,
+            PrecioVenta: Precio,
+            StockActual: 0,
+            StockMinimo: 0,
+            StockMaximo: 0,
+            Estatus: 1
+
+        }, { transaction: Transaccion });
+
+        // =========================
+        // COMMIT
+        // =========================
+
+        await Transaccion.commit();
+
+        return {
+            Producto: ProductoDB,
+            Inventario: InventarioDB
+        };
+
+    } catch (error) {
+
+        await Transaccion.rollback();
+        throw error;
+
+    }
+};
+
+const ObtenerInventarioPorCodigo = async (CodigoInventario) => {
+    try {
+        if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
+
+        const Inventario = await InventarioRelacion.findOne({
+            where: { CodigoInventario },
+            attributes: [
+                'CodigoInventario',
+                'CodigoBarras',
+                'PrecioVenta',
+                'StockActual',
+                'Estatus',
+                'CodigoEmpresa'
+            ],
+            include: [
+                {
+                    model: ProductoRelacion,
+                    as: 'Producto',
+                    attributes: ['CodigoProducto', 'NombreProducto', 'CodigoTipoProducto'],
+                    include: [
+                        {
+                            model: TipoProductoRelacion,
+                            as: 'TipoProducto',
+                            attributes: ['CodigoTipoProducto', 'NombreTipoProducto']
+                        }
+                    ]
+                },
+                {
+                    model: TipoTelaRelacion,
+                    as: 'TipoTela',
+                    attributes: ['CodigoTipoTela', 'NombreTipoTela']
+                },
+                {
+                    model: TelaRelacion,
+                    as: 'Tela',
+                    attributes: ['CodigoTela', 'NombreTela']
+                }
+            ]
+        });
+
+        if (!Inventario) LanzarError('Inventario no encontrado', 404);
+
+        return {
+            CodigoInventario: Inventario.CodigoInventario,
+            CodigoProducto: Inventario.Producto?.CodigoProducto,
+            NombreProducto: Inventario.Producto?.NombreProducto,
+            CodigoTipoProducto: Inventario.Producto?.TipoProducto?.CodigoTipoProducto,
+            NombreTipoProducto: Inventario.Producto?.TipoProducto?.NombreTipoProducto,
+            CodigoTipoTela: Inventario.TipoTela?.CodigoTipoTela,
+            NombreTipoTela: Inventario.TipoTela?.NombreTipoTela,
+            CodigoTela: Inventario.Tela?.CodigoTela,
+            NombreTela: Inventario.Tela?.NombreTela,
+            CodigoBarra: Inventario.CodigoBarras,
+            Precio: Inventario.PrecioVenta,
+            StockActual: Inventario.StockActual,
+            Estatus: Inventario.Estatus,
+            CodigoEmpresa: Inventario.CodigoEmpresa
+        };
+
+    } catch (error) {
+        throw error;
+    }
+};
+
+//CORREGIDOS
+
+const ObtenerInventarioListado = async (CodigoEmpresa) => {
+    try {
+        if (!CodigoEmpresa) LanzarError('Empresa es requerida', 400);
+
+        const Inventario = await InventarioRelacion.findAll({
+            where: { CodigoEmpresa, Estatus: { [Op.in]: [1, 2] } },
+            attributes: ['CodigoInventario', 'PrecioVenta'],
+            include: [
+                {
+                    model: ProductoRelacion,
+                    as: 'Producto',
+                    attributes: ['NombreProducto', 'CodigoTipoProducto', 'CodigoProducto'],
+                    required: true,
+                    where: { CodigoTipoProducto: 2 }
+                },
+                {
+                    model: TipoTelaRelacion,
+                    as: 'TipoTela',
+                    attributes: ['NombreTipoTela'],
+                    required: true
+                },
+                {
+                    model: TelaRelacion,
+                    as: 'Tela',
+                    attributes: ['NombreTela'],
+                    required: true
+                }
+            ],
+            order: [['CodigoInventario', 'DESC']]
+        });
+
+        const agrupado = {};
+
+        Inventario.forEach(item => {
+            const nombreProducto = item.Producto?.NombreProducto || 'Sin producto';
+
+            if (!agrupado[nombreProducto]) {
+                agrupado[nombreProducto] = {
+                    Producto: nombreProducto,
+                    CodigoProducto: item.Producto?.CodigoProducto || null, // ✅ ahora sí
+                    Variaciones: []
+                };
+            }
+
+            agrupado[nombreProducto].Variaciones.push({
+                CodigoInventario: item.CodigoInventario,
+                TipoTela: item.TipoTela?.NombreTipoTela || 'Sin tipo tela',
+                Tela: item.Tela?.NombreTela || 'Sin tela',
+                Precio: item.PrecioVenta
+            });
+        });
+
+        return Object.values(agrupado);
+
+    } catch (error) {
+        console.error('Error en ObtenerInventarioListado:', error);
+        throw error;
+    }
+};
+
+
+const CrearVariacionInventario = async (Datos, CodigoUsuario) => {
+    const Transaccion = await BaseDatos.transaction();
+
+    try {
+        const {
+            CodigoProducto,
+            CodigoTipoProducto,
+            CodigoTipoTela,
+            CodigoTela,
+            Precio
+        } = Datos;
+
+        const CodigoEmpresa = 1; // Empresa fija
+
+        // =========================
+        // VALIDACIONES
+        // =========================
+
+        if (!CodigoProducto)
+            LanzarError('Código de producto es requerido', 400);
+
+        if (!CodigoTipoProducto)
+            LanzarError('Tipo de producto es requerido', 400);
+
+        if (!CodigoTipoTela)
+            LanzarError('Tipo de tela es requerido', 400);
+
+        if (!CodigoTela)
+            LanzarError('Tela es requerida', 400);
+
+        if (Precio === undefined || Precio === null)
+            LanzarError('Precio es requerido', 400);
+
+        if (!CodigoUsuario)
+            LanzarError('Usuario es requerido', 400);
+
+        // =========================
+        // VALIDAR DUPLICADO EN INVENTARIO
+        // =========================
+
+        const ExisteInventario = await InventarioModelo.findOne({
+            where: {
+                CodigoProducto,
+                CodigoTipoTela,
+                CodigoTela,
+                CodigoEmpresa
+            },
+            transaction: Transaccion
+        });
+
+        if (ExisteInventario)
+            LanzarError('Esta variación ya existe en el inventario', 400);
+
+        // =========================
+        // CREAR NUEVA VARIACION EN INVENTARIO
+        // =========================
+
+        const InventarioDB = await InventarioModelo.create({
+            CodigoEmpresa,
+            CodigoProducto,
+            CodigoTipoTela,
+            CodigoTela,
+            PrecioVenta: Precio,
+            StockActual: 0,
+            StockMinimo: 0,
+            StockMaximo: 0,
+            Estatus: 1
+        }, { transaction: Transaccion });
+
+        // =========================
+        // COMMIT
+        // =========================
+
+        await Transaccion.commit();
+
+        return InventarioDB;
+
+    } catch (error) {
+        await Transaccion.rollback();
+        throw error;
+    }
+};
+
+
+const ObtenerInventarioEliminados = async (CodigoEmpresa) => {
+    try {
+        if (!CodigoEmpresa) LanzarError('Empresa es requerida', 400);
+
+        const Inventario = await InventarioRelacion.findAll({
+            where: { 
+                CodigoEmpresa, 
+                Estatus: 3 // ✅ solo cambia esto
+            },
+            attributes: ['CodigoInventario', 'PrecioVenta'],
+            include: [
+                {
+                    model: ProductoRelacion,
+                    as: 'Producto',
+                    attributes: ['NombreProducto', 'CodigoTipoProducto', 'CodigoProducto'],
+                    required: true,
+                    where: { CodigoTipoProducto: 2 }
+                },
+                {
+                    model: TipoTelaRelacion,
+                    as: 'TipoTela',
+                    attributes: ['NombreTipoTela'],
+                    required: true
+                },
+                {
+                    model: TelaRelacion,
+                    as: 'Tela',
+                    attributes: ['NombreTela'],
+                    required: true
+                }
+            ],
+            order: [['CodigoInventario', 'DESC']]
+        });
+
+        const agrupado = {};
+
+        Inventario.forEach(item => {
+            const nombreProducto = item.Producto?.NombreProducto || 'Sin producto';
+
+            if (!agrupado[nombreProducto]) {
+                agrupado[nombreProducto] = {
+                    Producto: nombreProducto,
+                    CodigoProducto: item.Producto?.CodigoProducto || null,
+                    Variaciones: []
+                };
+            }
+
+            agrupado[nombreProducto].Variaciones.push({
+                CodigoInventario: item.CodigoInventario,
+                TipoTela: item.TipoTela?.NombreTipoTela || 'Sin tipo tela',
+                Tela: item.Tela?.NombreTela || 'Sin tela',
+                Precio: item.PrecioVenta
+            });
+        });
+
+        return Object.values(agrupado);
+
+    } catch (error) {
+        console.error('Error en ObtenerInventarioEliminados:', error);
+        throw error;
+    }
+};
+const EliminarInventario = async (CodigoInventario, CodigoUsuario) => {
+    const Transaccion = await BaseDatos.transaction();
+
+    try {
+        if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
+        if (!CodigoUsuario) LanzarError('Usuario es requerido', 400);
+
+        // =========================
+        // 1. Buscar inventario
+        // =========================
+        const InventarioDB = await InventarioModelo.findOne({
+            where: { CodigoInventario },
+            transaction: Transaccion
+        });
+
+        if (!InventarioDB) LanzarError('Inventario no encontrado', 404);
+
+        // =========================
+        // 2. Actualizar estatus a 3
+        // =========================
+        await InventarioDB.update(
+            { Estatus: 3 },
+            { transaction: Transaccion }
+        );
+
+        // =========================
+        // 3. Registrar movimiento de inventario (opcional)
+        // =========================
+        await MovimientoInventarioModelo.create({
+            CodigoEmpresa: InventarioDB.CodigoEmpresa,
+            CodigoInventario: InventarioDB.CodigoInventario,
+            TipoMovimiento: 'SALIDA',
+            OrigenMovimiento: 'ELIMINACION',
+            CodigoDocumento: null,
+            Cantidad: InventarioDB.StockActual,
+            StockAnterior: InventarioDB.StockActual,
+            StockNuevo: 0,
+            Observacion: 'Inventario eliminado (estatus 3)',
+            CodigoUsuario,
+            FechaMovimiento: new Date()
+        }, { transaction: Transaccion });
+
+        await Transaccion.commit();
+
+        return { mensaje: 'Inventario eliminado correctamente', CodigoInventario };
+
+    } catch (error) {
+        await Transaccion.rollback();
+        throw error;
+    }
+};
+
+const RestaurarInventario = async (CodigosInventario, CodigoUsuario) => {
+    const Transaccion = await BaseDatos.transaction();
+
+    try {
+        // =========================
+        // 1. Validaciones
+        // =========================
+        if (!CodigosInventario || (Array.isArray(CodigosInventario) && CodigosInventario.length === 0)) {
+            LanzarError('Se requiere al menos un código de inventario', 400);
+        }
+        if (!CodigoUsuario) LanzarError('Usuario es requerido', 400);
+
+        // Asegurarse de que sea un array
+        const CodigosArray = Array.isArray(CodigosInventario) ? CodigosInventario : [CodigosInventario];
+
+        // =========================
+        // 2. Buscar inventarios existentes
+        // =========================
+        const InventariosDB = await InventarioModelo.findAll({
+            where: { CodigoInventario: { [Op.in]: CodigosArray } },
+            transaction: Transaccion
+        });
+
+        if (!InventariosDB || InventariosDB.length === 0) {
+            LanzarError('No se encontraron inventarios para restaurar', 404);
+        }
+
+        // =========================
+        // 3. Actualizar estatus a 1
+        // =========================
+        for (const inventario of InventariosDB) {
+            await inventario.update({ Estatus: 1 }, { transaction: Transaccion });
+
+            // =========================
+            // 4. Registrar movimiento
+            // =========================
+            await MovimientoInventarioModelo.create({
+                CodigoEmpresa: inventario.CodigoEmpresa,
+                CodigoInventario: inventario.CodigoInventario,
+                TipoMovimiento: 'ENTRADA',
+                OrigenMovimiento: 'RESTAURACION',
+                CodigoDocumento: null,
+                Cantidad: inventario.StockActual,
+                StockAnterior: 0,
+                StockNuevo: inventario.StockActual,
+                Observacion: 'Inventario restaurado (estatus 1)',
+                CodigoUsuario,
+                FechaMovimiento: new Date()
+            }, { transaction: Transaccion });
+        }
+
+        await Transaccion.commit();
+
+        return { mensaje: 'Inventario(s) restaurado(s) correctamente', CodigosInventario: CodigosArray };
+
+    } catch (error) {
+        await Transaccion.rollback();
+        throw error;
+    }
+};
+//FINAL CORREGIDOS
+
+
+
+// LISTADO PRODUCTOS
+const ListadoProducto = async () => {
+    try {
+
+        const productos = await ProductoRelacion.findAll({
+            where: { Estatus: 1 },
+            attributes: [
+                'CodigoProducto',
+                'NombreProducto',
+                'CodigoTipoProducto',
+                'PrecioBase'
+            ],
+            include: [
+                {
+                    model: TipoProductoRelacion,
+                    as: 'TipoProducto',
+                    attributes: ['CodigoTipoProducto', 'NombreTipoProducto']
+                }
+            ],
+            order: [['NombreProducto', 'ASC']]
+        });
+
+        return productos.map(p => ({
+            CodigoProducto: p.CodigoProducto,
+            NombreProducto: p.NombreProducto,
+            CodigoTipoProducto: p.TipoProducto?.CodigoTipoProducto,
+            TipoProducto: p.TipoProducto?.NombreTipoProducto,
+            PrecioBase: p.PrecioBase
+        }));
+
+    } catch (error) {
+        console.error(error);
+        LanzarError('Error al obtener productos', 500, 'Error');
+    }
+};
 const ListadoTipoTela = async () => {
     try {
         const tipos = await TipoTelaModelo.findAll({
@@ -42,47 +723,27 @@ const ListadoTipoTela = async () => {
     }
 };
 
-const ListadoNombreTela = async () => {
+const ListadoNombreTela = async (CodigoTipoTela) => {
     try {
 
-        // 1. Obtener telas
+        if (!CodigoTipoTela)
+            LanzarError('CodigoTipoTela es requerido', 400);
+
         const telas = await TelaModelo.findAll({
-            where: { Estatus: 1 },
+            where: { 
+                Estatus: 1,
+                CodigoTipoTela: CodigoTipoTela
+            },
             attributes: [
                 'CodigoTela',
-                'NombreTela',
-                'CodigoTipoTela'
+                'NombreTela'
             ],
             order: [['NombreTela', 'ASC']]
         });
 
-        // 2. Obtener tipos de tela
-        const tiposTela = await TipoTelaModelo.findAll({
-            where: { Estatus: 1 },
-            attributes: [
-                'CodigoTipoTela',
-                'NombreTipoTela'
-            ]
-        });
-
-        // 3. Crear mapa de tipos
-        const mapaTipoTela = {};
-
-        tiposTela.forEach(t => {
-            mapaTipoTela[t.CodigoTipoTela] = t.NombreTipoTela;
-        });
-
-        // 4. Unir información
         return telas.map(t => ({
-
             CodigoTela: t.CodigoTela,
-
-            CodigoTipoTela: t.CodigoTipoTela,
-
-            NombreTipoTela: mapaTipoTela[t.CodigoTipoTela] || '',
-
             NombreTela: t.NombreTela
-
         }));
 
     } catch (error) {
@@ -96,6 +757,7 @@ const ListadoNombreTela = async () => {
         );
     }
 };
+
 // CREAR
 const CrearTipoTela = async (data) => {
     try {
@@ -382,679 +1044,8 @@ const EliminarTela = async (codigo) => {
         );
     }
 };
-
-const ObtenerInventarioListado = async (CodigoEmpresa) => {
-    try {
-        if (!CodigoEmpresa) LanzarError('Empresa es requerida', 400);
-
-        const Inventario = await InventarioRelacion.findAll({
-            where: {
-                CodigoEmpresa,
-                Estatus: { [Op.in]: [1, 2] } // Solo registros activos e inactivos
-            },
-            attributes: [
-                'CodigoInventario',
-                'CodigoBarras',
-                'PrecioVenta',
-                'StockActual',
-                'Estatus' // <-- Asegúrate de incluirlo aquí
-            ],
-            include: [
-                {
-                    model: ProductoRelacion,
-                    as: 'Producto',
-                    attributes: ['CodigoProducto', 'NombreProducto'],
-                    required: true,
-                    include: [
-                        {
-                            model: TipoProductoRelacion,
-                            as: 'TipoProducto',
-                            attributes: ['NombreTipoProducto'],
-                            required: true,
-                            where: { NombreTipoProducto: 'FISICO' }
-                        }
-                    ]
-                },
-                { model: MarcaRelacion, as: 'Marca', attributes: ['NombreMarca'] },
-                { model: EstiloRelacion, as: 'Estilo', attributes: ['NombreEstilo'] },
-                { model: TallaRelacion, as: 'Talla', attributes: ['NombreTalla'] },
-                { model: ColorRelacion, as: 'Color', attributes: ['NombreColor'] }
-            ],
-            order: [['CodigoInventario', 'DESC']]
-        });
-
-        return Inventario.map(item => ({
-            CodigoInventario: item.CodigoInventario,
-            Producto: item.Producto?.NombreProducto || 'Sin producto',
-            TipoProducto: item.Producto?.TipoProducto?.NombreTipoProducto || 'Sin tipo',
-            CodigoBarra: item.CodigoBarras,
-            Marca: item.Marca?.NombreMarca || 'Sin marca',
-            Diseno: item.Estilo?.NombreEstilo || 'Sin estilo',
-            Talla: item.Talla?.NombreTalla || 'Sin talla',
-            Color: item.Color?.NombreColor || 'Sin color',
-            PrecioVenta: item.PrecioVenta,
-            StockActual: item.StockActual,
-            Estatus: item.Estatus // <-- Ahora sí lo tendrás en Angular
-        }));
-
-    } catch (error) {
-        console.error('Error en ObtenerInventarioListado:', error);
-        throw error;
-    }
-};
-const CrearProductoInventario = async (Datos, CodigoUsuario) => {
-
-    const Transaccion = await BaseDatos.transaction();
-
-    try {
-
-        const {
-            Producto,
-            CodigoTipoProducto,
-            CodigoMarca,
-            CodigoEstilo,
-            CodigoTalla,
-            CodigoColor,
-            CodigoBarra,
-            Precio,
-            Stock,
-            CodigoEmpresa,
-            CodigoCategoria
-        } = Datos;
-
-        // =========================
-        // VALIDACIONES
-        // =========================
-
-        if (!Producto)
-            LanzarError('Producto es requerido', 400);
-
-        if (!CodigoTipoProducto)
-            LanzarError('Tipo de producto es requerido', 400);
-
-        if (!CodigoMarca)
-            LanzarError('Marca es requerida', 400);
-
-        if (!CodigoEstilo)
-            LanzarError('Diseño es requerido', 400);
-
-        if (!CodigoTalla)
-            LanzarError('Talla es requerida', 400);
-
-        if (!CodigoColor)
-            LanzarError('Color es requerido', 400);
-
-        if (Precio === undefined || Precio === null)
-            LanzarError('Precio es requerido', 400);
-
-        if (Stock === undefined || Stock === null)
-            LanzarError('Stock es requerido', 400);
-
-        if (!CodigoEmpresa)
-            LanzarError('Empresa es requerida', 400);
-
-        if (!CodigoUsuario)
-            LanzarError('Usuario es requerido', 400);
-
-        // =========================
-        // 1. BUSCAR PRODUCTO
-        // =========================
-
-        let ProductoDB = await ProductoModelo.findOne({
-            where: {
-                NombreProducto: Producto,
-                CodigoEmpresa: CodigoEmpresa
-            },
-            transaction: Transaccion
-        });
-
-        // =========================
-        // 2. CREAR O ACTUALIZAR PRODUCTO
-        // =========================
-
-        if (!ProductoDB) {
-
-            ProductoDB = await ProductoModelo.create({
-                CodigoEmpresa,
-                CodigoTipoProducto,
-                CodigoCategoria,
-                NombreProducto: Producto,
-                PrecioBase: Precio,
-                Estatus: 1
-            }, { transaction: Transaccion });
-
-        } else {
-
-            await ProductoDB.update({
-                CodigoTipoProducto,
-                CodigoCategoria,
-                PrecioBase: Precio
-            }, { transaction: Transaccion });
-
-        }
-
-        // =========================
-        // 3. VALIDAR INVENTARIO DUPLICADO
-        // =========================
-
-        const ExisteInventario = await InventarioModelo.findOne({
-            where: {
-                CodigoEmpresa,
-                CodigoProducto: ProductoDB.CodigoProducto,
-                CodigoMarca,
-                CodigoEstilo,
-                CodigoTalla,
-                CodigoColor
-            },
-            transaction: Transaccion
-        });
-
-        if (ExisteInventario) {
-            LanzarError(
-                'Este producto ya existe en inventario con la misma combinación',
-                400
-            );
-        }
-
-        // =========================
-        // 4. CREAR INVENTARIO
-        // =========================
-
-        const InventarioDB = await InventarioModelo.create({
-            CodigoEmpresa,
-            CodigoProducto: ProductoDB.CodigoProducto,
-            CodigoMarca,
-            CodigoEstilo,
-            CodigoTalla,
-            CodigoColor,
-            CodigoBarras: CodigoBarra,
-            PrecioVenta: Precio,
-            StockActual: Stock,
-            StockMinimo: 0,
-            StockMaximo: 0,
-            Estatus: 1
-        }, { transaction: Transaccion });
-
-        // =========================
-        // 5. MOVIMIENTO INVENTARIO
-        // =========================
-
-        await MovimientoInventarioModelo.create({
-            CodigoEmpresa,
-            CodigoInventario: InventarioDB.CodigoInventario,
-            TipoMovimiento: 'ENTRADA',
-            OrigenMovimiento: 'CREACION',
-            CodigoDocumento: null,
-            Cantidad: Stock,
-            StockAnterior: 0,
-            StockNuevo: Stock,
-            Observacion: 'Creación inicial de inventario',
-            CodigoUsuario,
-            FechaMovimiento: new Date()
-        }, { transaction: Transaccion });
-
-        // =========================
-        // 6. COMMIT
-        // =========================
-
-        await Transaccion.commit();
-
-        return InventarioDB;
-
-    } catch (error) {
-
-        await Transaccion.rollback();
-        throw error;
-
-    }
-};
-
-const ObtenerInventarioPorCodigo = async (CodigoInventario) => {
-    try {
-        if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
-
-        const Inventario = await InventarioRelacion.findOne({
-            where: { CodigoInventario },
-            attributes: [
-                'CodigoInventario',
-                'CodigoBarras',
-                'PrecioVenta',
-                'StockActual',
-                'Estatus',
-                'CodigoEmpresa'
-            ],
-            include: [
-                {
-                    model: ProductoRelacion,
-                    as: 'Producto',
-                    attributes: ['CodigoProducto', 'NombreProducto', 'CodigoTipoProducto'], // Añadimos Código de TipoProducto
-                    include: [
-                        {
-                            model: TipoProductoModelo,
-                            as: 'TipoProducto',
-                            attributes: ['CodigoTipoProducto', 'NombreTipoProducto']
-                        }
-                    ]
-                },
-                {
-                    model: MarcaRelacion,
-                    as: 'Marca',
-                    attributes: ['CodigoMarca', 'NombreMarca']
-                },
-                {
-                    model: EstiloRelacion,
-                    as: 'Estilo',
-                    attributes: ['CodigoEstilo', 'NombreEstilo']
-                },
-                {
-                    model: TallaRelacion,
-                    as: 'Talla',
-                    attributes: ['CodigoTalla', 'NombreTalla']
-                },
-                {
-                    model: ColorRelacion,
-                    as: 'Color',
-                    attributes: ['CodigoColor', 'NombreColor']
-                }
-            ]
-        });
-
-        if (!Inventario) LanzarError('Inventario no encontrado', 404);
-
-        return {
-            CodigoInventario: Inventario.CodigoInventario,
-            CodigoProducto: Inventario.Producto?.CodigoProducto,
-            Producto: Inventario.Producto?.NombreProducto,
-            CodigoTipoProducto: Inventario.Producto?.TipoProducto?.CodigoTipoProducto,
-            TipoProducto: Inventario.Producto?.TipoProducto?.NombreTipoProducto,
-            CodigoMarca: Inventario.Marca?.CodigoMarca,
-            Marca: Inventario.Marca?.NombreMarca,
-            CodigoEstilo: Inventario.Estilo?.CodigoEstilo,
-            Diseno: Inventario.Estilo?.NombreEstilo,
-            CodigoTalla: Inventario.Talla?.CodigoTalla,
-            Talla: Inventario.Talla?.NombreTalla,
-            CodigoColor: Inventario.Color?.CodigoColor,
-            Color: Inventario.Color?.NombreColor,
-            CodigoBarra: Inventario.CodigoBarras,
-            PrecioVenta: Inventario.PrecioVenta,
-            StockActual: Inventario.StockActual,
-            Estatus: Inventario.Estatus,
-            CodigoEmpresa: Inventario.CodigoEmpresa
-        };
-
-    } catch (error) {
-        throw error;
-    }
-};
-
-const RestaurarInventario = async (CodigosInventario, CodigoUsuario) => {
-    const Transaccion = await BaseDatos.transaction();
-
-    try {
-        // =========================
-        // 1. Validaciones
-        // =========================
-        if (!CodigosInventario || (Array.isArray(CodigosInventario) && CodigosInventario.length === 0)) {
-            LanzarError('Se requiere al menos un código de inventario', 400);
-        }
-        if (!CodigoUsuario) LanzarError('Usuario es requerido', 400);
-
-        // Asegurarse de que sea un array
-        const CodigosArray = Array.isArray(CodigosInventario) ? CodigosInventario : [CodigosInventario];
-
-        // =========================
-        // 2. Buscar inventarios existentes
-        // =========================
-        const InventariosDB = await InventarioModelo.findAll({
-            where: { CodigoInventario: { [Op.in]: CodigosArray } },
-            transaction: Transaccion
-        });
-
-        if (!InventariosDB || InventariosDB.length === 0) {
-            LanzarError('No se encontraron inventarios para restaurar', 404);
-        }
-
-        // =========================
-        // 3. Actualizar estatus a 1
-        // =========================
-        for (const inventario of InventariosDB) {
-            await inventario.update({ Estatus: 1 }, { transaction: Transaccion });
-
-            // =========================
-            // 4. Registrar movimiento
-            // =========================
-            await MovimientoInventarioModelo.create({
-                CodigoEmpresa: inventario.CodigoEmpresa,
-                CodigoInventario: inventario.CodigoInventario,
-                TipoMovimiento: 'ENTRADA',
-                OrigenMovimiento: 'RESTAURACION',
-                CodigoDocumento: null,
-                Cantidad: inventario.StockActual,
-                StockAnterior: 0,
-                StockNuevo: inventario.StockActual,
-                Observacion: 'Inventario restaurado (estatus 1)',
-                CodigoUsuario,
-                FechaMovimiento: new Date()
-            }, { transaction: Transaccion });
-        }
-
-        await Transaccion.commit();
-
-        return { mensaje: 'Inventario(s) restaurado(s) correctamente', CodigosInventario: CodigosArray };
-
-    } catch (error) {
-        await Transaccion.rollback();
-        throw error;
-    }
-};
-
-const EliminarInventario = async (CodigoInventario, CodigoUsuario) => {
-    const Transaccion = await BaseDatos.transaction();
-
-    try {
-        if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
-        if (!CodigoUsuario) LanzarError('Usuario es requerido', 400);
-
-        // =========================
-        // 1. Buscar inventario
-        // =========================
-        const InventarioDB = await InventarioModelo.findOne({
-            where: { CodigoInventario },
-            transaction: Transaccion
-        });
-
-        if (!InventarioDB) LanzarError('Inventario no encontrado', 404);
-
-        // =========================
-        // 2. Actualizar estatus a 3
-        // =========================
-        await InventarioDB.update(
-            { Estatus: 3 },
-            { transaction: Transaccion }
-        );
-
-        // =========================
-        // 3. Registrar movimiento de inventario (opcional)
-        // =========================
-        await MovimientoInventarioModelo.create({
-            CodigoEmpresa: InventarioDB.CodigoEmpresa,
-            CodigoInventario: InventarioDB.CodigoInventario,
-            TipoMovimiento: 'SALIDA',
-            OrigenMovimiento: 'ELIMINACION',
-            CodigoDocumento: null,
-            Cantidad: InventarioDB.StockActual,
-            StockAnterior: InventarioDB.StockActual,
-            StockNuevo: 0,
-            Observacion: 'Inventario eliminado (estatus 3)',
-            CodigoUsuario,
-            FechaMovimiento: new Date()
-        }, { transaction: Transaccion });
-
-        await Transaccion.commit();
-
-        return { mensaje: 'Inventario eliminado correctamente', CodigoInventario };
-
-    } catch (error) {
-        await Transaccion.rollback();
-        throw error;
-    }
-};
-
-const ObtenerInventarioEliminados = async (CodigoEmpresa) => {
-    try {
-        if (!CodigoEmpresa) LanzarError('Empresa es requerida', 400);
-
-        const Inventario = await InventarioRelacion.findAll({
-            where: {
-                CodigoEmpresa,
-                Estatus: 3  // 🔹 Solo eliminados
-            },
-            attributes: [
-                'CodigoInventario',
-                'CodigoBarras',
-                'PrecioVenta',
-                'StockActual'
-            ],
-            include: [
-                {
-                    model: ProductoRelacion,
-                    as: 'Producto',
-                    attributes: ['NombreProducto']
-                },
-                {
-                    model: MarcaRelacion,
-                    as: 'Marca',
-                    attributes: ['NombreMarca']
-                },
-                {
-                    model: EstiloRelacion,
-                    as: 'Estilo',
-                    attributes: ['NombreEstilo']
-                },
-                {
-                    model: TallaRelacion,
-                    as: 'Talla',
-                    attributes: ['NombreTalla']
-                },
-                {
-                    model: ColorRelacion,
-                    as: 'Color',
-                    attributes: ['NombreColor']
-                }
-            ],
-            order: [['CodigoInventario', 'DESC']]
-        });
-
-        return Inventario.map(item => ({
-            CodigoInventario: item.CodigoInventario,
-            Producto: item.Producto?.NombreProducto,
-            CodigoBarra: item.CodigoBarras,
-            Marca: item.Marca?.NombreMarca,
-            Diseno: item.Estilo?.NombreEstilo,
-            Talla: item.Talla?.NombreTalla,
-            Color: item.Color?.NombreColor,
-            PrecioVenta: item.PrecioVenta,
-            StockActual: item.StockActual
-        }));
-
-    } catch (error) {
-        throw error;
-    }
-};
-
-const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuario) => {
-
-    const Transaccion = await BaseDatos.transaction();
-
-    try {
-
-        const {
-            Producto,
-            CodigoTipoProducto,
-            CodigoMarca,
-            CodigoEstilo,
-            CodigoTalla,
-            CodigoColor,
-            CodigoBarra,
-            Precio,
-            Stock,
-            CodigoEmpresa,
-            CodigoCategoria,
-            Estatus
-        } = Datos;
-
-        // =========================
-        // VALIDACIONES
-        // =========================
-
-        if (!CodigoInventario)
-            LanzarError('Código de inventario es requerido', 400);
-
-        if (!Producto)
-            LanzarError('Producto es requerido', 400);
-
-        if (!CodigoTipoProducto)
-            LanzarError('Tipo de producto es requerido', 400);
-
-        if (!CodigoMarca)
-            LanzarError('Marca es requerida', 400);
-
-        if (!CodigoEstilo)
-            LanzarError('Diseño es requerido', 400);
-
-        if (!CodigoTalla)
-            LanzarError('Talla es requerida', 400);
-
-        if (!CodigoColor)
-            LanzarError('Color es requerido', 400);
-
-        if (Precio === undefined || Precio === null)
-            LanzarError('Precio es requerido', 400);
-
-        if (Stock === undefined || Stock === null)
-            LanzarError('Stock es requerido', 400);
-
-        if (!CodigoEmpresa)
-            LanzarError('Empresa es requerida', 400);
-
-        if (!CodigoUsuario)
-            LanzarError('Usuario es requerido', 400);
-
-        if (Estatus === undefined || Estatus === null)
-            LanzarError('Estatus es requerido', 400);
-
-        // =========================
-        // 1. BUSCAR PRODUCTO
-        // =========================
-
-        let ProductoDB = await ProductoModelo.findOne({
-            where: {
-                NombreProducto: Producto,
-                CodigoEmpresa: CodigoEmpresa
-            },
-            transaction: Transaccion
-        });
-
-        // =========================
-        // 2. CREAR O ACTUALIZAR PRODUCTO
-        // =========================
-
-        if (!ProductoDB) {
-
-            ProductoDB = await ProductoModelo.create({
-                CodigoEmpresa,
-                CodigoTipoProducto,
-                CodigoCategoria,
-                NombreProducto: Producto,
-                PrecioBase: Precio,
-                Estatus: 1 // crear siempre activo
-            }, { transaction: Transaccion });
-
-        } else {
-
-            await ProductoDB.update({
-                CodigoTipoProducto,
-                CodigoCategoria,
-                PrecioBase: Precio,
-                Estatus: Estatus
-            }, { transaction: Transaccion });
-
-        }
-
-        // =========================
-        // 3. BUSCAR INVENTARIO
-        // =========================
-
-        const InventarioDB = await InventarioModelo.findOne({
-            where: { CodigoInventario },
-            transaction: Transaccion
-        });
-
-        if (!InventarioDB)
-            LanzarError('Inventario no encontrado', 404);
-
-        // =========================
-        // 4. VALIDAR DUPLICADO
-        // =========================
-
-        const ExisteOtroInventario = await InventarioModelo.findOne({
-            where: {
-                CodigoEmpresa,
-                CodigoProducto: ProductoDB.CodigoProducto,
-                CodigoMarca,
-                CodigoEstilo,
-                CodigoTalla,
-                CodigoColor,
-                CodigoInventario: { [Op.ne]: CodigoInventario }
-            },
-            transaction: Transaccion
-        });
-
-        if (ExisteOtroInventario) {
-            LanzarError(
-                'Otro inventario ya existe con la misma combinación',
-                400
-            );
-        }
-
-        // =========================
-        // 5. ACTUALIZAR INVENTARIO
-        // =========================
-
-        const StockAnterior = InventarioDB.StockActual;
-
-        await InventarioDB.update({
-            CodigoProducto: ProductoDB.CodigoProducto,
-            CodigoMarca,
-            CodigoEstilo,
-            CodigoTalla,
-            CodigoColor,
-            CodigoBarras: CodigoBarra,
-            PrecioVenta: Precio,
-            StockActual: Stock,
-            Estatus: Estatus
-        }, { transaction: Transaccion });
-
-        // =========================
-        // 6. MOVIMIENTO INVENTARIO
-        // =========================
-
-        if (StockAnterior !== Stock) {
-
-            await MovimientoInventarioModelo.create({
-                CodigoEmpresa,
-                CodigoInventario: InventarioDB.CodigoInventario,
-                TipoMovimiento: 'AJUSTE',
-                OrigenMovimiento: 'ACTUALIZACION',
-                CodigoDocumento: null,
-                Cantidad: Stock,
-                StockAnterior,
-                StockNuevo: Stock,
-                Observacion: 'Actualización de inventario',
-                CodigoUsuario,
-                FechaMovimiento: new Date()
-            }, { transaction: Transaccion });
-
-        }
-
-        // =========================
-        // 7. COMMIT
-        // =========================
-
-        await Transaccion.commit();
-
-        return InventarioDB;
-
-    } catch (error) {
-
-        await Transaccion.rollback();
-        throw error;
-
-    }
-};
-
 module.exports = {
-    EliminarTipoTela,EliminarTela,
+    EliminarTipoTela, EliminarTela,
     CrearProductoInventario,
     ObtenerInventarioListado,
     ObtenerInventarioPorCodigo,
@@ -1065,8 +1056,8 @@ module.exports = {
     CrearTipoTela,
     EditarTipoTela,
     ObtenerTipoTelaPorCodigo,
-    CrearTela,
-    EditarTela,
-    ObtenerTelaPorCodigo
+    CrearTela, ListadoNombreTelaCompleto,
+    EditarTela, ListadoProducto,
+    ObtenerTelaPorCodigo, CrearVariacionInventario
 
 };

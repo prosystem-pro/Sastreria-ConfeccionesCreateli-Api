@@ -31,6 +31,22 @@ module.exports = function(sequelize, DataTypes) {
         key: 'CodigoMarca'
       }
     },
+    CodigoTipoTela: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'TipoTela',
+        key: 'CodigoTipoTela'
+      }
+    },
+    CodigoTela: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'Tela',
+        key: 'CodigoTela'
+      }
+    },
     CodigoEstilo: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -79,7 +95,7 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.INTEGER,
       allowNull: true
     },
-    StockMaxicmo: {
+    StockMaximo: {
       type: DataTypes.INTEGER,
       allowNull: true
     },
