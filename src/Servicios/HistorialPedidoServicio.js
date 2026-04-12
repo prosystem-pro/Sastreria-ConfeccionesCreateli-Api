@@ -11,6 +11,218 @@ const { PedidoModelo, ClienteModelo, EstadoPedidoModelo, UsuarioModelo,
     TipoProductoModelo, TipoMedidaModelo, PagoModelo, PagoAplicacionModelo, TipoTelaModelo,
     TelaModelo, MovimientoInventarioModelo } = require('../Relaciones/Relaciones');
 
+
+//     const CrearPedido = async (datos, usuario) => {
+
+//     const transaccion = await BaseDatos.transaction();
+
+//     try {
+
+//         if (!datos.CodigoCliente)
+//             LanzarError('El cliente es obligatorio', 400, 'Advertencia');
+
+//         if (!datos.Productos || datos.Productos.length === 0)
+//             LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
+
+//         const CodigoEmpresa = 1;
+
+//         // ================= GENERAR DOCUMENTO DEL PEDIDO =================
+//         const documentoPedido = await GenerarDocumento(
+//             'PEDIDO',
+//             CodigoEmpresa,
+//             transaccion
+//         );
+
+//         if (!documentoPedido)
+//             LanzarError('No se pudo generar el documento del pedido', 500);
+
+//         // ================= CREAR PEDIDO =================
+//         const pedido = await PedidoModelo.create({
+
+//             CodigoEmpresa,
+//             CodigoCliente: datos.CodigoCliente,
+//             CodigoEstadoPedido: datos.CodigoEstadoPedido || 1,
+//             CodigoUsuario: usuario,
+
+//             Serie: documentoPedido.Serie,
+//             TipoDocumento: documentoPedido.TipoDocumento,
+//             NumeroDocumento: documentoPedido.NumeroDocumento,
+//             Numero: documentoPedido.Numero,
+
+//             FechaCreacion: new Date(),
+//             FechaEntrega: datos.FechaEntrega,
+
+//             Subtotal: datos.Subtotal,
+//             Descuento: datos.Descuento,
+//             Total: datos.Total,
+
+//             Observaciones: datos.Observaciones || null,
+//             Estatus: 1
+
+//         }, { transaction: transaccion });
+
+//         // ================= PRODUCTOS =================
+//         for (const producto of datos.Productos) {
+
+//             const inventario = await InventarioModelo.findOne({
+//                 where: { CodigoProducto: producto.CodigoProducto, Estatus: 1 },
+//                 transaction: transaccion,
+//                 lock: transaccion.LOCK.UPDATE
+//             });
+
+//             if (!inventario)
+//                 LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400);
+
+//             if (inventario.StockActual < producto.Cantidad)
+//                 LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400);
+
+//             const stockAnterior = inventario.StockActual;
+//             const stockNuevo = stockAnterior - producto.Cantidad;
+
+//             const detalle = await PedidoDetalleModelo.create({
+
+//                 CodigoPedido: pedido.CodigoPedido,
+//                 CodigoInventario: inventario.CodigoInventario,
+
+//                 CodigoTipoTela: producto.CodigoTipoTela || null,
+//                 CodigoTela: producto.CodigoTela || null,
+
+//                 Codigo: producto.Codigo || null,
+//                 Color: producto.Color || null,
+//                 Referencia: producto.Referencia || null,
+
+//                 Cantidad: producto.Cantidad,
+//                 PrecioVenta: producto.Precio,
+//                 Subtotal: producto.Subtotal,
+//                 Estatus: 1
+
+//             }, { transaction: transaccion });
+
+//             // ================= MEDIDAS =================
+//             if (producto.Medidas) {
+//                 for (const key in producto.Medidas) {
+
+//                     const valor = producto.Medidas[key];
+//                     if (valor === null || valor === undefined || valor === '')
+//                         continue;
+
+//                     const tipoMedida = await TipoMedidaModelo.findOne({
+//                         where: { NombreTipoMedida: key },
+//                         transaction: transaccion
+//                     });
+
+//                     if (!tipoMedida) continue;
+
+//                     const esNumero = typeof valor === 'number';
+
+//                     await PedidoDetalleMedidaModelo.create({
+//                         CodigoPedidoDetalle: detalle.CodigoPedidoDetalle,
+//                         CodigoTipoMedida: tipoMedida.CodigoTipoMedida,
+//                         Valor: esNumero ? valor : null,
+//                         Descripcion: !esNumero ? String(valor) : null
+//                     }, { transaction: transaccion });
+//                 }
+//             }
+
+//             // ================= INVENTARIO =================
+//             await inventario.update({ StockActual: stockNuevo }, { transaction: transaccion });
+
+//             // ================= MOVIMIENTO =================
+//             await MovimientoInventarioModelo.create({
+
+//                 CodigoEmpresa,
+//                 CodigoInventario: inventario.CodigoInventario,
+//                 CodigoUsuario: usuario,
+
+//                 TipoMovimiento: 'SALIDA',
+//                 OrigenMovimiento: 'PEDIDO',
+
+//                 TipoDocumento: documentoPedido.TipoDocumento,
+//                 CodigoDocumento: pedido.CodigoPedido,
+//                 NumeroDocumento: documentoPedido.NumeroDocumento,
+
+//                 Cantidad: producto.Cantidad,
+//                 StockAnterior: stockAnterior,
+//                 StockNuevo: stockNuevo,
+
+//                 FechaMovimiento: new Date(),
+//                 Observacion: `Salida por pedido ${documentoPedido.NumeroDocumento}`
+
+//             }, { transaction: transaccion });
+//         }
+
+//         // ================= PAGO INICIAL (SI EXISTE) =================
+//         if (datos.MontoPago && datos.FormaPago) {
+
+//             // ================= GENERAR DOCUMENTO DEL PAGO =================
+//             // ✅ Aquí enviamos CodigoPedido para que la numeración sea correcta
+//             const documentoPago = await GenerarDocumento(
+//                 'PAGO',
+//                 CodigoEmpresa,
+//                 transaccion,
+//                 pedido.CodigoPedido
+//             );
+
+//             if (!documentoPago)
+//                 LanzarError('No se pudo generar el documento de pago', 500);
+
+//             const saldoAnterior = 0; // primer pago
+//             const saldoPendiente = Number(pedido.Total) - Number(datos.MontoPago);
+
+//             const pago = await PagoModelo.create({
+
+//                 CodigoEmpresa,
+//                 CodigoUsuario: usuario,
+//                 CodigoFormaPago: datos.FormaPago,
+
+//                 Serie: documentoPago.Serie,
+//                 TipoDocumento: documentoPago.TipoDocumento,
+//                 NumeroDocumento: documentoPago.NumeroDocumento,
+//                 Numero: documentoPago.Numero,
+
+//                 SaldoAnterior: saldoAnterior,
+//                 SaldoPendiente: saldoPendiente,
+
+//                 Monto: datos.MontoPago,
+//                 FechaPago: new Date(),
+
+//                 NumeroComprobante: datos.Referencia || null,
+//                 UrlImagen: datos.UrlImagen || null,
+//                 Observacion: datos.Observacion || null,
+
+//                 Estatus: 1
+
+//             }, { transaction: transaccion });
+
+//             await PagoAplicacionModelo.create({
+
+//                 CodigoPago: pago.CodigoPago,
+
+//                 TipoDocumento: 'PEDIDO',
+//                 CodigoDocumento: pedido.CodigoPedido,
+//                 NumeroDocumento: documentoPago.NumeroDocumento,
+
+//                 MontoAplicado: datos.MontoPago,
+//                 SaldoAnterior: saldoAnterior,
+//                 SaldoPendiente: saldoPendiente
+
+//             }, { transaction: transaccion });
+//         }
+
+//         await transaccion.commit();
+
+//         return {
+//             CodigoPedido: pedido.CodigoPedido,
+//             NumeroDocumento: documentoPedido.NumeroDocumento
+//         };
+
+//     } catch (error) {
+
+//         await transaccion.rollback();
+//         throw error;
+//     }
+// };
+
 const EmpresaModelo = require('../Modelos/Empresa')(BaseDatos, Sequelize.DataTypes);
 const TipoProducto = require('../Modelos/TipoProducto')(BaseDatos, Sequelize.DataTypes);
 const TipoTela = require('../Modelos/TipoTela')(BaseDatos, Sequelize.DataTypes);
@@ -79,6 +291,14 @@ const CrearPedido = async (datos, usuario) => {
         // ================= PRODUCTOS =================
         for (const producto of datos.Productos) {
 
+            // ================= TIPO PRODUCTO =================
+            const tipoProducto = producto.NombreTipoProducto?.toUpperCase();
+            const esFisico = tipoProducto === 'FISICO';
+            const esConfeccion = tipoProducto === 'CONFECCION';
+
+            if (!esFisico && !esConfeccion)
+                LanzarError(`Tipo de producto no reconocido: ${tipoProducto}`, 400);
+
             const inventario = await InventarioModelo.findOne({
                 where: { CodigoProducto: producto.CodigoProducto, Estatus: 1 },
                 transaction: transaccion,
@@ -88,12 +308,20 @@ const CrearPedido = async (datos, usuario) => {
             if (!inventario)
                 LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400);
 
-            if (inventario.StockActual < producto.Cantidad)
-                LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400);
+            // ================= VALIDAR STOCK (SOLO FISICO) =================
+            let stockAnterior = null;
+            let stockNuevo = null;
 
-            const stockAnterior = inventario.StockActual;
-            const stockNuevo = stockAnterior - producto.Cantidad;
+            if (esFisico) {
 
+                if (inventario.StockActual < producto.Cantidad)
+                    LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400);
+
+                stockAnterior = inventario.StockActual;
+                stockNuevo = stockAnterior - producto.Cantidad;
+            }
+
+            // ================= DETALLE =================
             const detalle = await PedidoDetalleModelo.create({
 
                 CodigoPedido: pedido.CodigoPedido,
@@ -139,38 +367,38 @@ const CrearPedido = async (datos, usuario) => {
                 }
             }
 
-            // ================= INVENTARIO =================
-            await inventario.update({ StockActual: stockNuevo }, { transaction: transaccion });
+            // ================= INVENTARIO Y MOVIMIENTO (SOLO FISICO) =================
+            if (esFisico) {
 
-            // ================= MOVIMIENTO =================
-            await MovimientoInventarioModelo.create({
+                await inventario.update({ StockActual: stockNuevo }, { transaction: transaccion });
 
-                CodigoEmpresa,
-                CodigoInventario: inventario.CodigoInventario,
-                CodigoUsuario: usuario,
+                await MovimientoInventarioModelo.create({
 
-                TipoMovimiento: 'SALIDA',
-                OrigenMovimiento: 'PEDIDO',
+                    CodigoEmpresa,
+                    CodigoInventario: inventario.CodigoInventario,
+                    CodigoUsuario: usuario,
 
-                TipoDocumento: documentoPedido.TipoDocumento,
-                CodigoDocumento: pedido.CodigoPedido,
-                NumeroDocumento: documentoPedido.NumeroDocumento,
+                    TipoMovimiento: 'SALIDA',
+                    OrigenMovimiento: 'PEDIDO',
 
-                Cantidad: producto.Cantidad,
-                StockAnterior: stockAnterior,
-                StockNuevo: stockNuevo,
+                    TipoDocumento: documentoPedido.TipoDocumento,
+                    CodigoDocumento: pedido.CodigoPedido,
+                    NumeroDocumento: documentoPedido.NumeroDocumento,
 
-                FechaMovimiento: new Date(),
-                Observacion: `Salida por pedido ${documentoPedido.NumeroDocumento}`
+                    Cantidad: producto.Cantidad,
+                    StockAnterior: stockAnterior,
+                    StockNuevo: stockNuevo,
 
-            }, { transaction: transaccion });
+                    FechaMovimiento: new Date(),
+                    Observacion: `Salida por pedido ${documentoPedido.NumeroDocumento}`
+
+                }, { transaction: transaccion });
+            }
         }
 
         // ================= PAGO INICIAL (SI EXISTE) =================
         if (datos.MontoPago && datos.FormaPago) {
 
-            // ================= GENERAR DOCUMENTO DEL PAGO =================
-            // ✅ Aquí enviamos CodigoPedido para que la numeración sea correcta
             const documentoPago = await GenerarDocumento(
                 'PAGO',
                 CodigoEmpresa,
@@ -181,7 +409,7 @@ const CrearPedido = async (datos, usuario) => {
             if (!documentoPago)
                 LanzarError('No se pudo generar el documento de pago', 500);
 
-            const saldoAnterior = 0; // primer pago
+            const saldoAnterior = 0;
             const saldoPendiente = Number(pedido.Total) - Number(datos.MontoPago);
 
             const pago = await PagoModelo.create({
@@ -237,7 +465,6 @@ const CrearPedido = async (datos, usuario) => {
         throw error;
     }
 };
-
 const GenerarPDFPedido = async (CodigoPedido, res) => {
     try {
 
@@ -1288,8 +1515,6 @@ const ListarPagosPorPedido = async (codigoPedido) => {
     }
 
 };
-
-
 const ListadoEntregados = async () => {
     try {
 
@@ -1374,7 +1599,6 @@ const ListadoEntregados = async () => {
         LanzarError('Error al obtener pedidos entregados', 500, 'Error');
     }
 };
-
 const ActualizarPedido = async (datos, usuario) => {
 
     const transaccion = await BaseDatos.transaction();
@@ -1544,7 +1768,6 @@ const ActualizarPedido = async (datos, usuario) => {
         throw error;
     }
 };
-
 const Listado = async () => {
     try {
 
@@ -1715,7 +1938,6 @@ const Obtener = async (codigoPedido) => {
 
     }
 };
-
 const ListadoTipoProducto = async () => {
 
     try {
@@ -1749,7 +1971,62 @@ const ListadoTipoProducto = async () => {
     }
 
 };
+// const ListadoProducto = async (CodigoTipoProducto = null) => {
+//     try {
 
+//         const whereProducto = {
+//             Estatus: 1
+//         };
+
+//         if (CodigoTipoProducto) {
+//             whereProducto.CodigoTipoProducto = CodigoTipoProducto;
+//         }
+
+//         const productos = await ProductoModelo.findAll({
+
+//             where: whereProducto,
+
+//             include: [
+//                 {
+//                     model: InventarioModelo,
+//                     as: 'Inventarios',
+//                     attributes: [],
+//                     required: true
+//                 }
+//             ],
+
+//             attributes: [
+//                 'CodigoProducto',
+//                 'NombreProducto',
+//                 'CodigoTipoProducto',
+//                 [Sequelize.fn('SUM', Sequelize.col('Inventarios.StockActual')), 'StockActual']
+//             ],
+
+//             group: [
+//                 'Producto.CodigoProducto',
+//                 'Producto.NombreProducto',
+//                 'Producto.CodigoTipoProducto'
+//             ],
+
+//             order: [
+//                 ['NombreProducto', 'ASC']
+//             ],
+
+//             raw: true
+//         });
+
+//         return productos.map(p => ({
+//             CodigoProducto: p.CodigoProducto,
+//             NombreProducto: p.NombreProducto,
+//             CodigoTipoProducto: p.CodigoTipoProducto,
+//             StockActual: Number(p.StockActual) || 0
+//         }));
+
+//     } catch (error) {
+//         console.error(error);
+//         LanzarError('Error al obtener productos', 500, 'Error');
+//     }
+// };
 const ListadoProducto = async (CodigoTipoProducto = null) => {
     try {
 
@@ -1794,19 +2071,21 @@ const ListadoProducto = async (CodigoTipoProducto = null) => {
             raw: true
         });
 
-        return productos.map(p => ({
+        const resultado = productos.map(p => ({
             CodigoProducto: p.CodigoProducto,
             NombreProducto: p.NombreProducto,
             CodigoTipoProducto: p.CodigoTipoProducto,
             StockActual: Number(p.StockActual) || 0
         }));
 
+
+        return resultado;
+
     } catch (error) {
-        console.error(error);
+        console.error('[ListadoProducto] Error:', error);
         LanzarError('Error al obtener productos', 500, 'Error');
     }
 };
-
 const ListadoTipoTela = async () => {
 
     try {
@@ -1840,7 +2119,6 @@ const ListadoTipoTela = async () => {
     }
 
 };
-
 const ListadoTela = async () => {
 
     try {
@@ -1874,7 +2152,6 @@ const ListadoTela = async () => {
     }
 
 };
-
 const ListadoTipoCuello = async () => {
 
     try {
@@ -1960,7 +2237,6 @@ const ObtenerProducto = async (codigoProducto) => {
         LanzarError('Error al obtener producto', 500, 'Error');
     }
 };
-
 const ListadoCliente = async () => {
 
     try {
@@ -1994,7 +2270,6 @@ const ListadoCliente = async () => {
     }
 
 };
-
 const ListadoFormaPago = async () => {
     try {
         const formas = await FormaPago.findAll({
