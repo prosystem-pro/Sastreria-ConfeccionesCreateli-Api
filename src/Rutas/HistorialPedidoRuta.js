@@ -22,6 +22,7 @@ Router.get(`/${Modelo}/producto`, VerificarToken, VerificarPermisos('ListadoProd
 Router.get(`/${Modelo}/producto/:codigo`, VerificarToken, VerificarPermisos('UnidadProducto', Tabla), ObtenerProducto);
 Router.get(`/${Modelo}/cliente`, VerificarToken, VerificarPermisos('ListadoCliente', Tabla), ListadoCliente);
 Router.post(`/${Modelo}/crear`,VerificarToken,VerificarPermisos('CrearPedido', Tabla),CrearPedido);
+
 Router.get(`/${Modelo}/obtener-pedido/:CodigoPedido`, VerificarToken, VerificarPermisos('UnidadPedido', Tabla), ObtenerPedido);
 Router.put(`/${Modelo}/actualizar`, VerificarToken, VerificarPermisos('EditarPedido', Tabla), ActualizarPedido);
 Router.post(`/${Modelo}/pagar`, VerificarToken, VerificarPermisos('PagarPedido', Tabla), RegistrarPagoPedido);

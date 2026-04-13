@@ -12,234 +12,7 @@ const { PedidoModelo, ClienteModelo, EstadoPedidoModelo, UsuarioModelo,
     TelaModelo, MovimientoInventarioModelo } = require('../Relaciones/Relaciones');
 
 
-    const CrearPedido = async (datos, usuario) => {
-
-    const transaccion = await BaseDatos.transaction();
-
-    try {
-
-        if (!datos.CodigoCliente)
-            LanzarError('El cliente es obligatorio', 400, 'Advertencia');
-
-        if (!datos.Productos || datos.Productos.length === 0)
-            LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
-
-        const CodigoEmpresa = 1;
-
-        // ================= GENERAR DOCUMENTO DEL PEDIDO =================
-        const documentoPedido = await GenerarDocumento(
-            'PEDIDO',
-            CodigoEmpresa,
-            transaccion
-        );
-
-        if (!documentoPedido)
-            LanzarError('No se pudo generar el documento del pedido', 500);
-
-        // ================= CREAR PEDIDO =================
-        const pedido = await PedidoModelo.create({
-
-            CodigoEmpresa,
-            CodigoCliente: datos.CodigoCliente,
-            CodigoEstadoPedido: datos.CodigoEstadoPedido || 1,
-            CodigoUsuario: usuario,
-
-            Serie: documentoPedido.Serie,
-            TipoDocumento: documentoPedido.TipoDocumento,
-            NumeroDocumento: documentoPedido.NumeroDocumento,
-            Numero: documentoPedido.Numero,
-
-            FechaCreacion: new Date(),
-            FechaEntrega: datos.FechaEntrega,
-
-            Subtotal: datos.Subtotal,
-            Descuento: datos.Descuento,
-            Total: datos.Total,
-
-            Observaciones: datos.Observaciones || null,
-            Estatus: 1
-
-        }, { transaction: transaccion });
-
-        // ================= PRODUCTOS =================
-        for (const producto of datos.Productos) {
-
-            const inventario = await InventarioModelo.findOne({
-                where: { CodigoProducto: producto.CodigoProducto, Estatus: 1 },
-                transaction: transaccion,
-                lock: transaccion.LOCK.UPDATE
-            });
-
-            if (!inventario)
-                LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400);
-
-            if (inventario.StockActual < producto.Cantidad)
-                LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400);
-
-            const stockAnterior = inventario.StockActual;
-            const stockNuevo = stockAnterior - producto.Cantidad;
-
-            const detalle = await PedidoDetalleModelo.create({
-
-                CodigoPedido: pedido.CodigoPedido,
-                CodigoInventario: inventario.CodigoInventario,
-
-                CodigoTipoTela: producto.CodigoTipoTela || null,
-                CodigoTela: producto.CodigoTela || null,
-
-                Codigo: producto.Codigo || null,
-                Color: producto.Color || null,
-                Referencia: producto.Referencia || null,
-
-                Cantidad: producto.Cantidad,
-                PrecioVenta: producto.Precio,
-                Subtotal: producto.Subtotal,
-                Estatus: 1
-
-            }, { transaction: transaccion });
-
-            // ================= MEDIDAS =================
-            if (producto.Medidas) {
-                for (const key in producto.Medidas) {
-
-                    const valor = producto.Medidas[key];
-                    if (valor === null || valor === undefined || valor === '')
-                        continue;
-
-                    const tipoMedida = await TipoMedidaModelo.findOne({
-                        where: { NombreTipoMedida: key },
-                        transaction: transaccion
-                    });
-
-                    if (!tipoMedida) continue;
-
-                    const esNumero = typeof valor === 'number';
-
-                    await PedidoDetalleMedidaModelo.create({
-                        CodigoPedidoDetalle: detalle.CodigoPedidoDetalle,
-                        CodigoTipoMedida: tipoMedida.CodigoTipoMedida,
-                        Valor: esNumero ? valor : null,
-                        Descripcion: !esNumero ? String(valor) : null
-                    }, { transaction: transaccion });
-                }
-            }
-
-            // ================= INVENTARIO =================
-            await inventario.update({ StockActual: stockNuevo }, { transaction: transaccion });
-
-            // ================= MOVIMIENTO =================
-            await MovimientoInventarioModelo.create({
-
-                CodigoEmpresa,
-                CodigoInventario: inventario.CodigoInventario,
-                CodigoUsuario: usuario,
-
-                TipoMovimiento: 'SALIDA',
-                OrigenMovimiento: 'PEDIDO',
-
-                TipoDocumento: documentoPedido.TipoDocumento,
-                CodigoDocumento: pedido.CodigoPedido,
-                NumeroDocumento: documentoPedido.NumeroDocumento,
-
-                Cantidad: producto.Cantidad,
-                StockAnterior: stockAnterior,
-                StockNuevo: stockNuevo,
-
-                FechaMovimiento: new Date(),
-                Observacion: `Salida por pedido ${documentoPedido.NumeroDocumento}`
-
-            }, { transaction: transaccion });
-        }
-
-        // ================= PAGO INICIAL (SI EXISTE) =================
-        if (datos.MontoPago && datos.FormaPago) {
-
-            // ================= GENERAR DOCUMENTO DEL PAGO =================
-            // ✅ Aquí enviamos CodigoPedido para que la numeración sea correcta
-            const documentoPago = await GenerarDocumento(
-                'PAGO',
-                CodigoEmpresa,
-                transaccion,
-                pedido.CodigoPedido
-            );
-
-            if (!documentoPago)
-                LanzarError('No se pudo generar el documento de pago', 500);
-
-            const saldoAnterior = 0; // primer pago
-            const saldoPendiente = Number(pedido.Total) - Number(datos.MontoPago);
-
-            const pago = await PagoModelo.create({
-
-                CodigoEmpresa,
-                CodigoUsuario: usuario,
-                CodigoFormaPago: datos.FormaPago,
-
-                Serie: documentoPago.Serie,
-                TipoDocumento: documentoPago.TipoDocumento,
-                NumeroDocumento: documentoPago.NumeroDocumento,
-                Numero: documentoPago.Numero,
-
-                SaldoAnterior: saldoAnterior,
-                SaldoPendiente: saldoPendiente,
-
-                Monto: datos.MontoPago,
-                FechaPago: new Date(),
-
-                NumeroComprobante: datos.Referencia || null,
-                UrlImagen: datos.UrlImagen || null,
-                Observacion: datos.Observacion || null,
-
-                Estatus: 1
-
-            }, { transaction: transaccion });
-
-            await PagoAplicacionModelo.create({
-
-                CodigoPago: pago.CodigoPago,
-
-                TipoDocumento: 'PEDIDO',
-                CodigoDocumento: pedido.CodigoPedido,
-                NumeroDocumento: documentoPago.NumeroDocumento,
-
-                MontoAplicado: datos.MontoPago,
-                SaldoAnterior: saldoAnterior,
-                SaldoPendiente: saldoPendiente
-
-            }, { transaction: transaccion });
-        }
-
-        await transaccion.commit();
-
-        return {
-            CodigoPedido: pedido.CodigoPedido,
-            NumeroDocumento: documentoPedido.NumeroDocumento
-        };
-
-    } catch (error) {
-
-        await transaccion.rollback();
-        throw error;
-    }
-};
-
-const EmpresaModelo = require('../Modelos/Empresa')(BaseDatos, Sequelize.DataTypes);
-const TipoProducto = require('../Modelos/TipoProducto')(BaseDatos, Sequelize.DataTypes);
-const TipoTela = require('../Modelos/TipoTela')(BaseDatos, Sequelize.DataTypes);
-const Tela = require('../Modelos/Tela')(BaseDatos, Sequelize.DataTypes);
-const Producto = require('../Modelos/Producto')(BaseDatos, Sequelize.DataTypes);
-const Cliente = require('../Modelos/Cliente')(BaseDatos, Sequelize.DataTypes);
-const TipoCuello = require('../Modelos/TipoCuello')(BaseDatos, Sequelize.DataTypes);
-const EstadoPedido = require('../Modelos/EstadoPedido')(BaseDatos, Sequelize.DataTypes);
-const PedidoDetalle = require('../Modelos/PedidoDetalle')(BaseDatos, Sequelize.DataTypes);
-const PedidoDetalleMedida = require('../Modelos/PedidoDetalleMedida')(BaseDatos, Sequelize.DataTypes);
-const TipoMedida = require('../Modelos/TipoMedida')(BaseDatos, Sequelize.DataTypes);
-const FormaPago = require('../Modelos/FormaPago')(BaseDatos, Sequelize.DataTypes);
-const { GenerarDocumento } = require('../Utilidades/GeneradorDocumento');
-const { LanzarError } = require('../Utilidades/ErrorServicios');
-const { Op } = require('sequelize');
-
-// const CrearPedido = async (datos, usuario) => {
+//     const CrearPedido = async (datos, usuario) => {
 
 //     const transaccion = await BaseDatos.transaction();
 
@@ -291,14 +64,6 @@ const { Op } = require('sequelize');
 //         // ================= PRODUCTOS =================
 //         for (const producto of datos.Productos) {
 
-//             // ================= TIPO PRODUCTO =================
-//             const tipoProducto = producto.NombreTipoProducto?.toUpperCase();
-//             const esFisico = tipoProducto === 'FISICO';
-//             const esConfeccion = tipoProducto === 'CONFECCION';
-
-//             if (!esFisico && !esConfeccion)
-//                 LanzarError(`Tipo de producto no reconocido: ${tipoProducto}`, 400);
-
 //             const inventario = await InventarioModelo.findOne({
 //                 where: { CodigoProducto: producto.CodigoProducto, Estatus: 1 },
 //                 transaction: transaccion,
@@ -308,20 +73,12 @@ const { Op } = require('sequelize');
 //             if (!inventario)
 //                 LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400);
 
-//             // ================= VALIDAR STOCK (SOLO FISICO) =================
-//             let stockAnterior = null;
-//             let stockNuevo = null;
+//             if (inventario.StockActual < producto.Cantidad)
+//                 LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400);
 
-//             if (esFisico) {
+//             const stockAnterior = inventario.StockActual;
+//             const stockNuevo = stockAnterior - producto.Cantidad;
 
-//                 if (inventario.StockActual < producto.Cantidad)
-//                     LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400);
-
-//                 stockAnterior = inventario.StockActual;
-//                 stockNuevo = stockAnterior - producto.Cantidad;
-//             }
-
-//             // ================= DETALLE =================
 //             const detalle = await PedidoDetalleModelo.create({
 
 //                 CodigoPedido: pedido.CodigoPedido,
@@ -367,38 +124,38 @@ const { Op } = require('sequelize');
 //                 }
 //             }
 
-//             // ================= INVENTARIO Y MOVIMIENTO (SOLO FISICO) =================
-//             if (esFisico) {
+//             // ================= INVENTARIO =================
+//             await inventario.update({ StockActual: stockNuevo }, { transaction: transaccion });
 
-//                 await inventario.update({ StockActual: stockNuevo }, { transaction: transaccion });
+//             // ================= MOVIMIENTO =================
+//             await MovimientoInventarioModelo.create({
 
-//                 await MovimientoInventarioModelo.create({
+//                 CodigoEmpresa,
+//                 CodigoInventario: inventario.CodigoInventario,
+//                 CodigoUsuario: usuario,
 
-//                     CodigoEmpresa,
-//                     CodigoInventario: inventario.CodigoInventario,
-//                     CodigoUsuario: usuario,
+//                 TipoMovimiento: 'SALIDA',
+//                 OrigenMovimiento: 'PEDIDO',
 
-//                     TipoMovimiento: 'SALIDA',
-//                     OrigenMovimiento: 'PEDIDO',
+//                 TipoDocumento: documentoPedido.TipoDocumento,
+//                 CodigoDocumento: pedido.CodigoPedido,
+//                 NumeroDocumento: documentoPedido.NumeroDocumento,
 
-//                     TipoDocumento: documentoPedido.TipoDocumento,
-//                     CodigoDocumento: pedido.CodigoPedido,
-//                     NumeroDocumento: documentoPedido.NumeroDocumento,
+//                 Cantidad: producto.Cantidad,
+//                 StockAnterior: stockAnterior,
+//                 StockNuevo: stockNuevo,
 
-//                     Cantidad: producto.Cantidad,
-//                     StockAnterior: stockAnterior,
-//                     StockNuevo: stockNuevo,
+//                 FechaMovimiento: new Date(),
+//                 Observacion: `Salida por pedido ${documentoPedido.NumeroDocumento}`
 
-//                     FechaMovimiento: new Date(),
-//                     Observacion: `Salida por pedido ${documentoPedido.NumeroDocumento}`
-
-//                 }, { transaction: transaccion });
-//             }
+//             }, { transaction: transaccion });
 //         }
 
 //         // ================= PAGO INICIAL (SI EXISTE) =================
 //         if (datos.MontoPago && datos.FormaPago) {
 
+//             // ================= GENERAR DOCUMENTO DEL PAGO =================
+//             // ✅ Aquí enviamos CodigoPedido para que la numeración sea correcta
 //             const documentoPago = await GenerarDocumento(
 //                 'PAGO',
 //                 CodigoEmpresa,
@@ -409,7 +166,7 @@ const { Op } = require('sequelize');
 //             if (!documentoPago)
 //                 LanzarError('No se pudo generar el documento de pago', 500);
 
-//             const saldoAnterior = 0;
+//             const saldoAnterior = 0; // primer pago
 //             const saldoPendiente = Number(pedido.Total) - Number(datos.MontoPago);
 
 //             const pago = await PagoModelo.create({
@@ -465,6 +222,249 @@ const { Op } = require('sequelize');
 //         throw error;
 //     }
 // };
+
+const EmpresaModelo = require('../Modelos/Empresa')(BaseDatos, Sequelize.DataTypes);
+const TipoProducto = require('../Modelos/TipoProducto')(BaseDatos, Sequelize.DataTypes);
+const TipoTela = require('../Modelos/TipoTela')(BaseDatos, Sequelize.DataTypes);
+const Tela = require('../Modelos/Tela')(BaseDatos, Sequelize.DataTypes);
+const Producto = require('../Modelos/Producto')(BaseDatos, Sequelize.DataTypes);
+const Cliente = require('../Modelos/Cliente')(BaseDatos, Sequelize.DataTypes);
+const TipoCuello = require('../Modelos/TipoCuello')(BaseDatos, Sequelize.DataTypes);
+const EstadoPedido = require('../Modelos/EstadoPedido')(BaseDatos, Sequelize.DataTypes);
+const PedidoDetalle = require('../Modelos/PedidoDetalle')(BaseDatos, Sequelize.DataTypes);
+const PedidoDetalleMedida = require('../Modelos/PedidoDetalleMedida')(BaseDatos, Sequelize.DataTypes);
+const TipoMedida = require('../Modelos/TipoMedida')(BaseDatos, Sequelize.DataTypes);
+const FormaPago = require('../Modelos/FormaPago')(BaseDatos, Sequelize.DataTypes);
+const { GenerarDocumento } = require('../Utilidades/GeneradorDocumento');
+const { LanzarError } = require('../Utilidades/ErrorServicios');
+const { Op } = require('sequelize');
+
+const CrearPedido = async (datos, usuario) => {
+
+    const transaccion = await BaseDatos.transaction();
+
+    try {
+
+        if (!datos.CodigoCliente)
+            LanzarError('El cliente es obligatorio', 400, 'Advertencia');
+
+        if (!datos.Productos || datos.Productos.length === 0)
+            LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
+
+        const CodigoEmpresa = 1;
+
+        // ================= GENERAR DOCUMENTO DEL PEDIDO =================
+        const documentoPedido = await GenerarDocumento(
+            'PEDIDO',
+            CodigoEmpresa,
+            transaccion
+        );
+
+        if (!documentoPedido)
+            LanzarError('No se pudo generar el documento del pedido', 500);
+
+        // ================= CREAR PEDIDO =================
+        const pedido = await PedidoModelo.create({
+
+            CodigoEmpresa,
+            CodigoCliente: datos.CodigoCliente,
+            CodigoEstadoPedido: datos.CodigoEstadoPedido || 1,
+            CodigoUsuario: usuario,
+
+            Serie: documentoPedido.Serie,
+            TipoDocumento: documentoPedido.TipoDocumento,
+            NumeroDocumento: documentoPedido.NumeroDocumento,
+            Numero: documentoPedido.Numero,
+
+            FechaCreacion: new Date(),
+            FechaEntrega: datos.FechaEntrega,
+
+            Subtotal: datos.Subtotal,
+            Descuento: datos.Descuento,
+            Total: datos.Total,
+
+            Observaciones: datos.Observaciones || null,
+            Estatus: 1
+
+        }, { transaction: transaccion });
+
+        // ================= PRODUCTOS =================
+        for (const producto of datos.Productos) {
+
+            // ================= TIPO PRODUCTO =================
+            const tipoProducto = producto.NombreTipoProducto?.toUpperCase();
+            const esFisico = tipoProducto === 'FISICO';
+            const esConfeccion = tipoProducto === 'CONFECCION';
+
+            if (!esFisico && !esConfeccion)
+                LanzarError(`Tipo de producto no reconocido: ${tipoProducto}`, 400);
+
+            const inventario = await InventarioModelo.findOne({
+                where: { CodigoProducto: producto.CodigoProducto, Estatus: 1 },
+                transaction: transaccion,
+                lock: transaccion.LOCK.UPDATE
+            });
+
+            if (!inventario)
+                LanzarError(`No hay inventario para el producto ${producto.CodigoProducto}`, 400);
+
+            // ================= VALIDAR STOCK (SOLO FISICO) =================
+            let stockAnterior = null;
+            let stockNuevo = null;
+
+            if (esFisico) {
+
+                if (inventario.StockActual < producto.Cantidad)
+                    LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400);
+
+                stockAnterior = inventario.StockActual;
+                stockNuevo = stockAnterior - producto.Cantidad;
+            }
+
+            // ================= DETALLE =================
+            const detalle = await PedidoDetalleModelo.create({
+
+                CodigoPedido: pedido.CodigoPedido,
+                CodigoInventario: inventario.CodigoInventario,
+
+                CodigoTipoTela: producto.CodigoTipoTela || null,
+                CodigoTela: producto.CodigoTela || null,
+
+                Codigo: producto.Codigo || null,
+                Color: producto.Color || null,
+                Referencia: producto.Referencia || null,
+
+                Cantidad: producto.Cantidad,
+                PrecioVenta: producto.Precio,
+                Subtotal: producto.Subtotal,
+                Estatus: 1
+
+            }, { transaction: transaccion });
+
+            // ================= MEDIDAS =================
+            if (producto.Medidas) {
+                for (const key in producto.Medidas) {
+
+                    const valor = producto.Medidas[key];
+                    if (valor === null || valor === undefined || valor === '')
+                        continue;
+
+                    const tipoMedida = await TipoMedidaModelo.findOne({
+                        where: { NombreTipoMedida: key },
+                        transaction: transaccion
+                    });
+
+                    if (!tipoMedida) continue;
+
+                    const esNumero = typeof valor === 'number';
+
+                    await PedidoDetalleMedidaModelo.create({
+                        CodigoPedidoDetalle: detalle.CodigoPedidoDetalle,
+                        CodigoTipoMedida: tipoMedida.CodigoTipoMedida,
+                        Valor: esNumero ? valor : null,
+                        Descripcion: !esNumero ? String(valor) : null
+                    }, { transaction: transaccion });
+                }
+            }
+
+            // ================= INVENTARIO Y MOVIMIENTO (SOLO FISICO) =================
+            if (esFisico) {
+
+                await inventario.update({ StockActual: stockNuevo }, { transaction: transaccion });
+
+                await MovimientoInventarioModelo.create({
+
+                    CodigoEmpresa,
+                    CodigoInventario: inventario.CodigoInventario,
+                    CodigoUsuario: usuario,
+
+                    TipoMovimiento: 'SALIDA',
+                    OrigenMovimiento: 'PEDIDO',
+
+                    TipoDocumento: documentoPedido.TipoDocumento,
+                    CodigoDocumento: pedido.CodigoPedido,
+                    NumeroDocumento: documentoPedido.NumeroDocumento,
+
+                    Cantidad: producto.Cantidad,
+                    StockAnterior: stockAnterior,
+                    StockNuevo: stockNuevo,
+
+                    FechaMovimiento: new Date(),
+                    Observacion: `Salida por pedido ${documentoPedido.NumeroDocumento}`
+
+                }, { transaction: transaccion });
+            }
+        }
+
+        // ================= PAGO INICIAL (SI EXISTE) =================
+        if (datos.MontoPago && datos.FormaPago) {
+
+            const documentoPago = await GenerarDocumento(
+                'PAGO',
+                CodigoEmpresa,
+                transaccion,
+                pedido.CodigoPedido
+            );
+
+            if (!documentoPago)
+                LanzarError('No se pudo generar el documento de pago', 500);
+
+            const saldoAnterior = 0;
+            const saldoPendiente = Number(pedido.Total) - Number(datos.MontoPago);
+
+            const pago = await PagoModelo.create({
+
+                CodigoEmpresa,
+                CodigoUsuario: usuario,
+                CodigoFormaPago: datos.FormaPago,
+
+                Serie: documentoPago.Serie,
+                TipoDocumento: documentoPago.TipoDocumento,
+                NumeroDocumento: documentoPago.NumeroDocumento,
+                Numero: documentoPago.Numero,
+
+                SaldoAnterior: saldoAnterior,
+                SaldoPendiente: saldoPendiente,
+
+                Monto: datos.MontoPago,
+                FechaPago: new Date(),
+
+                NumeroComprobante: datos.Referencia || null,
+                UrlImagen: datos.UrlImagen || null,
+                Observacion: datos.Observacion || null,
+
+                Estatus: 1
+
+            }, { transaction: transaccion });
+
+            await PagoAplicacionModelo.create({
+
+                CodigoPago: pago.CodigoPago,
+
+                TipoDocumento: 'PEDIDO',
+                CodigoDocumento: pedido.CodigoPedido,
+                NumeroDocumento: documentoPago.NumeroDocumento,
+
+                MontoAplicado: datos.MontoPago,
+                SaldoAnterior: saldoAnterior,
+                SaldoPendiente: saldoPendiente
+
+            }, { transaction: transaccion });
+        }
+
+        await transaccion.commit();
+
+        return {
+            CodigoPedido: pedido.CodigoPedido,
+            NumeroDocumento: documentoPedido.NumeroDocumento
+        };
+
+    } catch (error) {
+
+        await transaccion.rollback();
+        throw error;
+    }
+};
 const GenerarPDFPedido = async (CodigoPedido, res) => {
     try {
 

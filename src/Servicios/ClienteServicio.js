@@ -93,16 +93,20 @@ const Eliminar = async (codigo) => {
     const registro = await Modelo.findByPk(codigo);
 
     if (!registro) {
-      LanzarError('Cliente no encontrado');
+      LanzarError('Cliente no encontrado', 404);
     }
 
-    // DELETE real
     await registro.destroy();
 
     return true;
 
   } catch (error) {
-    LanzarError('Error al eliminar cliente', error);
+    // Si es error de llave foránea, mensaje claro con status 400
+    if (error.name === 'SequelizeForeignKeyConstraintError') {
+      LanzarError('No se puede eliminar el cliente porque tiene pedidos asociados', 400);
+    }
+    // Si ya es un error lanzado por LanzarError, lo re-lanzamos tal cual
+    throw error;
   }
 };
 
