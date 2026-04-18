@@ -178,7 +178,6 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
 };
 
 const CrearProductoInventario = async (Datos, CodigoUsuario) => {
-    console.log('Ira', Datos)
     const Transaccion = await BaseDatos.transaction();
 
     try {
