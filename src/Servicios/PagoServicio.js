@@ -7,7 +7,7 @@ const { DateTime } = require('luxon');
 const { LanzarError } = require('../Utilidades/ErrorServicios');
 
 const NombreModelo = 'NumeroBoleta';
-const CodigoModelo = 'CodigoPago';
+const CodigoModelo = 'CodigoPagos';
 
 const Listado = async (Anio) => {
   const Registros = await Modelo.findAll({
@@ -116,7 +116,7 @@ const ObtenerResumenGeneralPagos = async (Anio) => {
 
   const resumen = await Modelo.findAll({
     attributes: [
-      [fn('COUNT', col('CodigoPago')), 'CantidadPagos'],
+      [fn('COUNT', col('CodigoPagos')), 'CantidadPagos'],
       [fn('SUM', literal(`CASE WHEN UrlComprobante IS NOT NULL AND LTRIM(RTRIM(UrlComprobante)) <> '' THEN 1 ELSE 0 END`)), 'PagosConComprobante'],
       [fn('SUM', literal(`CASE WHEN UrlComprobante IS NULL OR LTRIM(RTRIM(UrlComprobante)) = '' THEN 1 ELSE 0 END`)), 'PagosSinComprobante'],
       [fn('SUM', literal(`
@@ -152,7 +152,7 @@ const ObtenerResumenGeneralPagos = async (Anio) => {
   const r = resumen[0];
 
   const pagosPendientes = await Modelo.findAll({
-    attributes: ['CodigoPago', 'FechaVencimientoPago'],
+    attributes: ['CodigoPagos', 'FechaVencimientoPago'],
     where: {
       Estatus: [1, 2, 3],
       [Op.and]: [

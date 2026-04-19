@@ -13,6 +13,7 @@ var _Marca = require("./Marca");
 var _MovimientoInventario = require("./MovimientoInventario");
 var _Pago = require("./Pago");
 var _PagoAplicacion = require("./PagoAplicacion");
+var _Pagos = require("./Pagos");
 var _Pedido = require("./Pedido");
 var _PedidoDetalle = require("./PedidoDetalle");
 var _PedidoDetalleMedida = require("./PedidoDetalleMedida");
@@ -48,6 +49,7 @@ function initModels(sequelize) {
   var MovimientoInventario = _MovimientoInventario(sequelize, DataTypes);
   var Pago = _Pago(sequelize, DataTypes);
   var PagoAplicacion = _PagoAplicacion(sequelize, DataTypes);
+  var Pagos = _Pagos(sequelize, DataTypes);
   var Pedido = _Pedido(sequelize, DataTypes);
   var PedidoDetalle = _PedidoDetalle(sequelize, DataTypes);
   var PedidoDetalleMedida = _PedidoDetalleMedida(sequelize, DataTypes);
@@ -68,6 +70,8 @@ function initModels(sequelize) {
   var TipoTela = _TipoTela(sequelize, DataTypes);
   var Usuario = _Usuario(sequelize, DataTypes);
 
+  Pagos.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
+  Empresa.hasMany(Pagos, { as: "Pagos", foreignKey: "CodigoEmpresa"});
   Usuario.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
   Empresa.hasMany(Usuario, { as: "Usuarios", foreignKey: "CodigoEmpresa"});
   Cliente.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
@@ -75,7 +79,7 @@ function initModels(sequelize) {
   Producto.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
   Empresa.hasMany(Producto, { as: "Productos", foreignKey: "CodigoEmpresa"});
   Pago.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
-  Empresa.hasMany(Pago, { as: "Pagos", foreignKey: "CodigoEmpresa"});
+  Empresa.hasMany(Pago, { as: "CodigoEmpresa_Pagos", foreignKey: "CodigoEmpresa"});
   Inventario.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
   Empresa.hasMany(Inventario, { as: "Inventarios", foreignKey: "CodigoEmpresa"});
   MovimientoInventario.belongsTo(Empresa, { as: "CodigoEmpresa_Empresa", foreignKey: "CodigoEmpresa"});
@@ -166,6 +170,7 @@ function initModels(sequelize) {
     MovimientoInventario,
     Pago,
     PagoAplicacion,
+    Pagos,
     Pedido,
     PedidoDetalle,
     PedidoDetalleMedida,
