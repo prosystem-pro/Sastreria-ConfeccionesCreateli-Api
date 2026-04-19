@@ -12,6 +12,7 @@ const PermisoRuta = require("./Rutas/PermisoRuta");
 const PermisoRolRecursoRuta = require("./Rutas/PermisoRolRecursoRuta");
 const RecursoRuta = require("./Rutas/RecursoRuta");
 const PagoRuta = require("./Rutas/PagoRuta");
+const ResumenGeneralPago = require("./Rutas/EstadoTecnicoEmpresaRuta");
 const Login = require("./Rutas/LoginRuta");
 //GENERAL
 const ClienteRuta = require("./Rutas/ClienteRuta");
@@ -43,6 +44,7 @@ App.use(`/${Ruter}`, PermisoRuta);
 App.use(`/${Ruter}`, PermisoRolRecursoRuta);
 App.use(`/${Ruter}`, RecursoRuta);
 App.use(`/${Ruter}`, PagoRuta);
+App.use(`/${Ruter}`, ResumenGeneralPago);
 
 //GENERAL
 App.use(`/${Ruter}`, ClienteRuta);
