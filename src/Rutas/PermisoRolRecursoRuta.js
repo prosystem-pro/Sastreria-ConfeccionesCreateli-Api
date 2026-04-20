@@ -61,7 +61,7 @@ Router.delete(`/${Modelo}/eliminar-por-rol-recurso-permiso/:CodigoRol/:CodigoRec
 // Filtros
 Router.get(`/${Modelo}/filtrar-roles`, VerificarToken, VerificarPermisos('VerRol', Tabla), FiltrarRoles);
 Router.get(`/${Modelo}/filtrar-recursos/:CodigoRol`, VerificarToken, VerificarPermisos('VerRecurso', Tabla), FiltrarRecursos);
-Router.get(`/${Modelo}/filtrar-permisos/:CodigoRol/:CodigoRecurso`, VerificarToken, VerificarPermisos('VerPermiso', Tabla), FiltrarPermisos);
+Router.get(`/${Modelo}-filtrar-permisos/:CodigoRol/:CodigoRecurso`, VerificarToken, VerificarPermisos('VerPermiso', Tabla), FiltrarPermisos);
 
 // Resumen
 Router.get(`/${Modelo}/resumen`, VerificarToken, VerificarPermisos('VerResumenPermisos', Tabla), ObtenerResumenPermisos);

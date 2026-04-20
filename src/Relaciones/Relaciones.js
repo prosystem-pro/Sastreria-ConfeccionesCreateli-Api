@@ -77,11 +77,21 @@ MovimientoInventarioModelo.belongsTo(InventarioModelo, { foreignKey: 'CodigoInve
 MovimientoInventarioModelo.belongsTo(UsuarioModelo, { foreignKey: 'CodigoUsuario', as: 'Usuario' }); UsuarioModelo.hasMany(MovimientoInventarioModelo, { foreignKey: 'CodigoUsuario', as: 'MovimientosInventario' });
 MovimientoInventarioModelo.belongsTo(EmpresaModelo, { foreignKey: 'CodigoEmpresa', as: 'Empresa' }); EmpresaModelo.hasMany(MovimientoInventarioModelo, { foreignKey: 'CodigoEmpresa', as: 'MovimientosInventario' });
 
+// Pedido - Empresa
+PedidoModelo.belongsTo(EmpresaModelo, { 
+    foreignKey: 'CodigoEmpresa', 
+    as: 'AdEmpresa' 
+});
+
+EmpresaModelo.hasMany(PedidoModelo, { 
+    foreignKey: 'CodigoEmpresa', 
+    as: 'Pedidos' 
+});
 // ===================== EXPORTAR MODELOS =====================
 module.exports = {
   UsuarioModelo, EmpresaModelo, RolModelo, PermisoModelo, PermisoRolRecursoModelo, RecursoModelo,
   ClienteModelo, PedidoModelo, EstadoPedidoModelo, PagoModelo, PagoAplicacionModelo,
   ProductoModelo, InventarioModelo, PedidoDetalleMedidaModelo, TipoMedidaModelo, PedidoDetalleModelo,
   TipoProductoModelo, TipoTelaModelo, TelaModelo, MarcaModelo, EstiloModelo, TallaModelo, ColorModelo,
-  MovimientoInventarioModelo, BaseDatos
+  MovimientoInventarioModelo, BaseDatos, EmpresaModelo
 };
