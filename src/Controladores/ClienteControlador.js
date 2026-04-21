@@ -3,6 +3,7 @@
 const Servicio = require('../Servicios/ClienteServicio');
 const ManejarError = require('../Utilidades/ErrorControladores');
 const ResponderExito = require('../Utilidades/RespuestaExitosaControlador');
+const { LanzarError } = require('../Utilidades/ErrorServicios');
 
 
 const Listado = async (req, res) => {

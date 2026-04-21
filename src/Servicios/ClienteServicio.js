@@ -16,25 +16,26 @@ const Listado = async () => {
 };
 
 const Crear = async (datos) => {
+  try {
+    const registro = await Modelo.create({
+      NombreCliente: datos.NombreCliente,
+      NIT: datos.NIT,
+      Celular: datos.Celular,
+      Estatus: 1,
+      Direccion: datos.Direccion,
+      CodigoEmpresa: datos.CodigoEmpresa
+    });
 
-    try {
+    return registro;
 
-        const registro = await Modelo.create({
-            NombreCliente: datos.NombreCliente,
-            NIT: datos.NIT,
-            Celular: datos.Celular,
-            Estatus: 1,
-            Direccion: datos.Direccion,
-            CodigoEmpresa: datos.CodigoEmpresa
-        });
+  } catch (error) {
 
-        return registro;
-
-    } catch (error) {
-
-        LanzarError('Error al crear cliente', error);
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      LanzarError('El cliente ya existe (NIT duplicado)', 400);
     }
 
+    LanzarError('Error al crear cliente', 500);
+  }
 };
 
 const Obtener = async (codigo) => {
@@ -64,28 +65,31 @@ const Obtener = async (codigo) => {
 };
 
 const Editar = async (codigo, datos) => {
+  try {
+    const registro = await Modelo.findByPk(codigo);
 
-    try {
-
-        const registro = await Modelo.findByPk(codigo);
-
-        if (!registro) {
-            LanzarError('Cliente no encontrado');
-        }
-
-        await registro.update({
-            NombreCliente: datos.NombreCliente,
-            NIT: datos.NIT,
-            Celular: datos.Celular
-        });
-
-        return registro;
-
-    } catch (error) {
-
-        LanzarError('Error al editar cliente', error);
+    if (!registro) {
+      LanzarError('Cliente no encontrado', 404);
     }
 
+    await registro.update({
+      NombreCliente: datos.NombreCliente,
+      NIT: datos.NIT,
+      Celular: datos.Celular
+    });
+
+    return registro;
+
+  } catch (error) {
+
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      LanzarError('Ya existe un cliente con ese NIT', 400);
+    }
+
+    if (error.statusCode) throw error;
+
+    LanzarError('Error al editar cliente', 500);
+  }
 };
 
 const Eliminar = async (codigo) => {
@@ -101,12 +105,14 @@ const Eliminar = async (codigo) => {
     return true;
 
   } catch (error) {
-    // Si es error de llave foránea, mensaje claro con status 400
+
     if (error.name === 'SequelizeForeignKeyConstraintError') {
       LanzarError('No se puede eliminar el cliente porque tiene pedidos asociados', 400);
     }
-    // Si ya es un error lanzado por LanzarError, lo re-lanzamos tal cual
-    throw error;
+
+    if (error.statusCode) throw error;
+
+    LanzarError('Error al eliminar cliente', 500);
   }
 };
 
