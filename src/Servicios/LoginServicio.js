@@ -5,8 +5,8 @@ const { LanzarError } = require('../Utilidades/ErrorServicios');
 const { ObtenerPermisosFrontEnd } = require('../Servicios/PermisoRolRecursoServicio');
 
 const IniciarSesionServicio = async (NombreUsuario, Clave) => {
-   if (!NombreUsuario || !Clave) {
-    console.error("Error: Nombre de usuario y contraseña son requeridos");
+
+  if (!NombreUsuario || !Clave) {
     LanzarError("Nombre de usuario y contraseña son requeridos", 400);
   }
 
@@ -27,25 +27,28 @@ const IniciarSesionServicio = async (NombreUsuario, Clave) => {
   });
 
   if (!Usuario) {
-    console.error("Error: Usuario o contraseña incorrectos (no se encontró usuario)");
     LanzarError("Usuario o contraseña incorrectos", 400);
   }
 
   const Valida = await CompararClaves(Clave, Usuario.ClaveHash);
 
   if (!Valida) {
-    console.error("Error: Usuario o contraseña incorrectos (contraseña inválida)");
     LanzarError("Usuario o contraseña incorrectos", 400);
   }
 
+  // 🔴 SUPER ADMIN (SIN permisos)
   if (Usuario.SuperAdmin === 1) {
+
     const Token = GenerarToken({
       CodigoUsuario: Usuario.CodigoUsuario,
       CodigoRol: null,
       NombreUsuario: Usuario.NombreUsuario,
       NombreRol: null,
-      SuperAdmin:  Usuario.SuperAdmin,
-      AccesoCompleto: true
+      CodigoEmpresa: Usuario.CodigoEmpresa || null,
+      NombreEmpresa: Usuario.Empresa?.NombreEmpresa || null,
+      SuperAdmin: Usuario.SuperAdmin,
+      AccesoCompleto: true,
+      Permisos: [] // 👈 CORRECTO
     });
 
     return {
@@ -55,6 +58,8 @@ const IniciarSesionServicio = async (NombreUsuario, Clave) => {
         NombreUsuario: Usuario.NombreUsuario,
         CodigoRol: null,
         NombreRol: null,
+        CodigoEmpresa: Usuario.CodigoEmpresa || null,
+        NombreEmpresa: Usuario.Empresa?.NombreEmpresa || null,
         SuperAdmin: Usuario.SuperAdmin,
         AccesoCompleto: true,
         Permisos: []
@@ -62,19 +67,20 @@ const IniciarSesionServicio = async (NombreUsuario, Clave) => {
     };
   }
 
+  // 🔴 VALIDACIONES
   if (Usuario.Estatus !== 1) {
-    console.error("Error: Usuario inactivo");
     LanzarError("Usuario inactivo", 403);
   }
+
   if (!Usuario.Rol || Usuario.Rol.Estatus !== 1) {
-    console.error("Error: Rol inactivo o no asignado");
     LanzarError("Rol inactivo o no asignado", 403);
   }
+
   if (!Usuario.Empresa || Usuario.Empresa.Estatus !== 1) {
-    console.error("Error: Empresa inactiva o no asignada");
     LanzarError("Empresa inactiva o no asignada", 403);
   }
 
+  // ✅ Obtener permisos ANTES de usarlos
   const permisos = await ObtenerPermisosFrontEnd(Usuario.CodigoRol);
 
   const Token = GenerarToken({
@@ -82,6 +88,8 @@ const IniciarSesionServicio = async (NombreUsuario, Clave) => {
     CodigoRol: Usuario.CodigoRol,
     NombreUsuario: Usuario.NombreUsuario,
     NombreRol: Usuario.Rol?.NombreRol || null,
+    CodigoEmpresa: Usuario.CodigoEmpresa,
+    NombreEmpresa: Usuario.Empresa?.NombreEmpresa || null,
     SuperAdmin: Usuario.SuperAdmin,
     AccesoCompleto: false,
     Permisos: permisos.Recursos
@@ -94,6 +102,8 @@ const IniciarSesionServicio = async (NombreUsuario, Clave) => {
       NombreUsuario: Usuario.NombreUsuario,
       CodigoRol: Usuario.CodigoRol,
       NombreRol: Usuario.Rol?.NombreRol || null,
+      CodigoEmpresa: Usuario.CodigoEmpresa,
+      NombreEmpresa: Usuario.Empresa?.NombreEmpresa || null,
       SuperAdmin: Usuario.SuperAdmin,
       AccesoCompleto: false,
       Permisos: permisos.Recursos

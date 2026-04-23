@@ -9,7 +9,9 @@ const GenerarToken = (datos) => {
       CodigoRol: datos.CodigoRol,
       NombreUsuario: datos.NombreUsuario,
       NombreRol: datos.NombreRol,
-      SuperAdmin: datos.SuperAdmin,
+      CodigoEmpresa: datos.CodigoEmpresa,
+      NombreEmpresa: datos.NombreEmpresa,
+      SuperAdmin: datos.SuperAdmin
     },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN }

@@ -39,10 +39,17 @@ const GenerarPDFPagoPedido = async (req, res) => {
 const CrearPedido = async (req, res) => {
   try {
 
-    const datos = req.body;
-    const CodigoUsuario = req.Datos.CodigoUsuario;
+    const { CodigoUsuario, CodigoEmpresa, SuperAdmin } = req.Datos;
 
-    const Objeto = await Servicio.CrearPedido(datos, CodigoUsuario);
+    if (SuperAdmin) {
+      LanzarError('SuperAdmin no puede crear pedidos sin empresa', 403);
+    }
+
+    const Objeto = await Servicio.CrearPedido(
+      req.body,
+      CodigoUsuario,
+      CodigoEmpresa
+    );
 
     return ResponderExito(
       res,
@@ -60,7 +67,6 @@ const CrearPedido = async (req, res) => {
 
   }
 };
-
 const ObtenerPedido = async (req, res) => {
   try {
 
@@ -215,8 +221,17 @@ const RegistrarPagoPedido = async (req, res) => {
 
 const Listado = async (req, res) => {
   try {
-    const Objeto = await Servicio.Listado();
-    return ResponderExito(res, 'Listado de pedidos obtenido correctamente.', Objeto || []);
+
+    const { CodigoEmpresa, SuperAdmin, NombreEmpresa } = req.Datos;
+
+    const Objeto = await Servicio.Listado(CodigoEmpresa, SuperAdmin, NombreEmpresa);
+
+    return ResponderExito(
+      res,
+      'Listado de pedidos obtenido correctamente.',
+      Objeto || []
+    );
+
   } catch (error) {
     return ManejarError(error, res, 'Error al obtener los pedidos');
   }
@@ -419,7 +434,9 @@ const ObtenerProducto = async (req, res) => {
 const ListadoCliente = async (req, res) => {
   try {
 
-    const clientes = await Servicio.ListadoCliente();
+    const { CodigoEmpresa, SuperAdmin } = req.Datos;
+
+    const clientes = await Servicio.ListadoCliente(CodigoEmpresa, SuperAdmin);
 
     return ResponderExito(
       res,
@@ -428,9 +445,7 @@ const ListadoCliente = async (req, res) => {
     );
 
   } catch (error) {
-
     return ManejarError(error, res, 'Error al obtener clientes');
-
   }
 };
 

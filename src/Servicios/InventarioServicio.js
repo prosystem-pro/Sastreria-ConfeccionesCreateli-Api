@@ -30,8 +30,7 @@ const ObtenerInventarioListado = async (CodigoEmpresa) => {
         const Inventario = await InventarioRelacion.findAll({
             where: {
                 CodigoEmpresa,
-                Estatus: { [Op.in]: [1, 2] },
-                StockActual: { [Op.gt]: 0 } // 🔹 Solo inventarios con stock
+                Estatus: { [Op.in]: [1, 2] }
             },
             attributes: [
                 'CodigoInventario',
@@ -50,7 +49,7 @@ const ObtenerInventarioListado = async (CodigoEmpresa) => {
                         'CodigoTipoProducto'
                     ],
                     required: true,
-                    where: { CodigoTipoProducto: 1 }, // 🔹 Solo FISICO
+                    where: { CodigoTipoProducto: 1 },
                     include: [
                         {
                             model: TipoProductoRelacion,
@@ -71,8 +70,6 @@ const ObtenerInventarioListado = async (CodigoEmpresa) => {
             order: [['CodigoInventario', 'DESC']]
         });
 
-
-        // Mapeo
         const resultado = Inventario.map(item => ({
             CodigoInventario: item.CodigoInventario,
             Producto: item.Producto?.NombreProducto || 'Sin producto',
@@ -87,14 +84,7 @@ const ObtenerInventarioListado = async (CodigoEmpresa) => {
             Estatus: item.Estatus
         }));
 
-        // 🔹 Eliminar duplicados por Producto
-        const resultadoUnico = resultado.reduce((acc, current) => {
-            if (!acc.find(x => x.Producto === current.Producto)) acc.push(current);
-            return acc;
-        }, []);
-
-
-        return resultadoUnico;
+        return resultado;
 
     } catch (error) {
         console.error('Error en ObtenerInventarioListado:', error);
