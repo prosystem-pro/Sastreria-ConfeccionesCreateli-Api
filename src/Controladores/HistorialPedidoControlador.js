@@ -240,7 +240,13 @@ const Listado = async (req, res) => {
 const ListadoEntregados = async (req, res) => {
   try {
 
-    const Objeto = await Servicio.ListadoEntregados();
+    const { CodigoEmpresa, SuperAdmin, NombreEmpresa } = req.Datos;
+
+    const Objeto = await Servicio.ListadoEntregados(
+      CodigoEmpresa,
+      SuperAdmin,
+      NombreEmpresa
+    );
 
     return ResponderExito(
       res,

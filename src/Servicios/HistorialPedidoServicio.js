@@ -1534,16 +1534,22 @@ const ListarPagosPorPedido = async (codigoPedido) => {
     }
 
 };
-const ListadoEntregados = async () => {
+const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa) => {
     try {
 
-        // 1️⃣ Traer solo pedidos ENTREGADOS
+        let where = {
+            Estatus: { [Op.in]: [1, 2, 3, 4] }
+        };
+
+        if (!SuperAdmin) {
+            where.CodigoEmpresa = CodigoEmpresa;
+        }
+
         const pedidos = await PedidoModelo.findAll({
-            where: {
-                Estatus: { [Op.in]: [1, 2, 3, 4] }
-            },
+            where,
             attributes: [
                 'CodigoPedido',
+                'CodigoEmpresa',
                 'FechaCreacion',
                 'FechaEntrega',
                 'Subtotal',
@@ -1573,7 +1579,6 @@ const ListadoEntregados = async () => {
             order: [['FechaCreacion', 'DESC']]
         });
 
-        // 2️⃣ Calcular pagos
         const resultado = [];
 
         for (const p of pedidos) {
@@ -1597,6 +1602,9 @@ const ListadoEntregados = async () => {
 
             resultado.push({
                 CodigoPedido: p.CodigoPedido,
+                CodigoEmpresa: p.CodigoEmpresa,
+                NombreEmpresa: NombreEmpresa, // 👈 CONSISTENCIA CON OTROS SERVICIOS
+
                 NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
                 FechaCreacion: p.FechaCreacion,
                 FechaEntrega: p.FechaEntrega,
@@ -1614,8 +1622,10 @@ const ListadoEntregados = async () => {
         return resultado;
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al obtener pedidos entregados', 500, 'Error');
+
+        if (error.statusCode) throw error;
+
+        LanzarError('Error al obtener pedidos entregados', 500);
     }
 };
 const ActualizarPedido = async (datos, usuario) => {
