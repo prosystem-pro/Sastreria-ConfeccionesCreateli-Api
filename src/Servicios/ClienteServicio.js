@@ -28,12 +28,21 @@ const Crear = async (datos, CodigoEmpresa) => {
     try {
 
         const camposRequeridos = ['NombreCliente', 'NIT', 'Celular', 'Direccion'];
+        const faltantes = [];
 
+        // 🔴 Detectar todos los campos faltantes
         for (const campo of camposRequeridos) {
             if (!datos[campo] || String(datos[campo]).trim() === '') {
-                LanzarError(`El campo ${campo} es obligatorio`, 400);
+                faltantes.push(campo);
             }
         }
+
+        // 🔴 Lanzar error consolidado
+        if (faltantes.length > 0) {
+            LanzarError(`Faltan campos obligatorios: ${faltantes.join(', ')}`, 400);
+        }
+
+        // 🔴 Normalización
         const payload = {
             NombreCliente: datos.NombreCliente.trim(),
             NIT: datos.NIT.trim(),
@@ -50,6 +59,7 @@ const Crear = async (datos, CodigoEmpresa) => {
 
     } catch (error) {
 
+        // 🔴 UNIQUE
         if (error.name === 'SequelizeUniqueConstraintError') {
 
             const campo = error.errors?.[0]?.path;
@@ -65,12 +75,13 @@ const Crear = async (datos, CodigoEmpresa) => {
             LanzarError('Cliente duplicado', 400);
         }
 
+        // 🔴 VALIDACIONES Sequelize
         if (error.name === 'SequelizeValidationError') {
             const errores = error.errors.map(e => e.message);
             LanzarError(errores.join(', '), 400);
         }
 
-
+        // 🔴 DB fallback
         if (error.name === 'SequelizeDatabaseError') {
             if (error.parent?.message.includes('NULL')) {
                 LanzarError('Faltan campos obligatorios', 400);
@@ -121,14 +132,21 @@ const Editar = async (codigo, datos, CodigoEmpresa) => {
             LanzarError('Cliente no encontrado o no pertenece a la empresa', 404);
         }
 
+        // 🔴 Validación consolidada
         const camposRequeridos = ['NombreCliente', 'NIT', 'Celular', 'Direccion'];
+        const faltantes = [];
 
         for (const campo of camposRequeridos) {
             if (!datos[campo] || String(datos[campo]).trim() === '') {
-                LanzarError(`El campo ${campo} es obligatorio`, 400);
+                faltantes.push(campo);
             }
         }
 
+        if (faltantes.length > 0) {
+            LanzarError(`Faltan campos obligatorios: ${faltantes.join(', ')}`, 400);
+        }
+
+        // 🔴 Normalización
         const payload = {
             NombreCliente: datos.NombreCliente.trim(),
             NIT: datos.NIT.trim(),
@@ -143,6 +161,7 @@ const Editar = async (codigo, datos, CodigoEmpresa) => {
 
     } catch (error) {
 
+        // 🔴 UNIQUE
         if (error.name === 'SequelizeUniqueConstraintError') {
 
             const campo = error.errors?.[0]?.path;
@@ -158,11 +177,13 @@ const Editar = async (codigo, datos, CodigoEmpresa) => {
             LanzarError('Cliente duplicado', 400);
         }
 
+        // 🔴 VALIDACIONES Sequelize
         if (error.name === 'SequelizeValidationError') {
             const errores = error.errors.map(e => e.message);
             LanzarError(errores.join(', '), 400);
         }
 
+        // 🔴 DB fallback
         if (error.name === 'SequelizeDatabaseError') {
             if (error.parent?.message.includes('NULL')) {
                 LanzarError('Faltan campos obligatorios', 400);
@@ -171,6 +192,7 @@ const Editar = async (codigo, datos, CodigoEmpresa) => {
 
         if (error.statusCode) throw error;
 
+        // 🔥 errores reales
         throw error;
     }
 };
