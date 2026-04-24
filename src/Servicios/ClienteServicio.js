@@ -27,36 +27,32 @@ const Listado = async (CodigoEmpresa, SuperAdmin) => {
 const Crear = async (datos, CodigoEmpresa) => {
     try {
 
-        const registro = await Modelo.create({
-            NombreCliente: datos.NombreCliente,
-            NIT: datos.NIT,
-            Celular: datos.Celular,
-            Direccion: datos.Direccion,
-            Correo: datos.Correo || null,
+        const camposRequeridos = ['NombreCliente', 'NIT', 'Celular', 'Direccion'];
+
+        for (const campo of camposRequeridos) {
+            if (!datos[campo] || String(datos[campo]).trim() === '') {
+                LanzarError(`El campo ${campo} es obligatorio`, 400);
+            }
+        }
+        const payload = {
+            NombreCliente: datos.NombreCliente.trim(),
+            NIT: datos.NIT.trim(),
+            Celular: datos.Celular.trim(),
+            Direccion: datos.Direccion.trim(),
+            Correo: datos.Correo ? datos.Correo.trim() : null,
             Estatus: 1,
-            CodigoEmpresa: CodigoEmpresa
-        });
+            CodigoEmpresa
+        };
+
+        const registro = await Modelo.create(payload);
 
         return registro;
 
     } catch (error) {
 
-        if (error.name === 'SequelizeValidationError') {
-            const errores = error.errors
-                .filter(e => e.validatorKey === 'not_null')
-                .map(e => `El campo ${e.path} es obligatorio`);
-
-            if (errores.length > 0) {
-                LanzarError(errores.join(', '), 400);
-            }
-
-            const otros = error.errors.map(e => e.message);
-            LanzarError(otros.join(', '), 400);
-        }
-
         if (error.name === 'SequelizeUniqueConstraintError') {
 
-            const campo = error.errors[0].path;
+            const campo = error.errors?.[0]?.path;
 
             if (campo === 'NIT') {
                 LanzarError('Ya existe un cliente con ese NIT en esta empresa', 400);
@@ -69,6 +65,12 @@ const Crear = async (datos, CodigoEmpresa) => {
             LanzarError('Cliente duplicado', 400);
         }
 
+        if (error.name === 'SequelizeValidationError') {
+            const errores = error.errors.map(e => e.message);
+            LanzarError(errores.join(', '), 400);
+        }
+
+
         if (error.name === 'SequelizeDatabaseError') {
             if (error.parent?.message.includes('NULL')) {
                 LanzarError('Faltan campos obligatorios', 400);
@@ -78,7 +80,6 @@ const Crear = async (datos, CodigoEmpresa) => {
         throw error;
     }
 };
-
 const Obtener = async (codigo, CodigoEmpresa, SuperAdmin) => {
     try {
 
@@ -120,34 +121,31 @@ const Editar = async (codigo, datos, CodigoEmpresa) => {
             LanzarError('Cliente no encontrado o no pertenece a la empresa', 404);
         }
 
-        await registro.update({
-            NombreCliente: datos.NombreCliente,
-            NIT: datos.NIT,
-            Celular: datos.Celular,
-            Direccion: datos.Direccion,
-            Correo: datos.Correo ?? null // opcional
-        });
+        const camposRequeridos = ['NombreCliente', 'NIT', 'Celular', 'Direccion'];
+
+        for (const campo of camposRequeridos) {
+            if (!datos[campo] || String(datos[campo]).trim() === '') {
+                LanzarError(`El campo ${campo} es obligatorio`, 400);
+            }
+        }
+
+        const payload = {
+            NombreCliente: datos.NombreCliente.trim(),
+            NIT: datos.NIT.trim(),
+            Celular: datos.Celular.trim(),
+            Direccion: datos.Direccion.trim(),
+            Correo: datos.Correo ? datos.Correo.trim() : null
+        };
+
+        await registro.update(payload);
 
         return registro;
 
     } catch (error) {
 
-        if (error.name === 'SequelizeValidationError') {
-            const errores = error.errors
-                .filter(e => e.validatorKey === 'not_null')
-                .map(e => `El campo ${e.path} es obligatorio`);
-
-            if (errores.length > 0) {
-                LanzarError(errores.join(', '), 400);
-            }
-
-            const otros = error.errors.map(e => e.message);
-            LanzarError(otros.join(', '), 400);
-        }
-
         if (error.name === 'SequelizeUniqueConstraintError') {
 
-            const campo = error.errors[0].path;
+            const campo = error.errors?.[0]?.path;
 
             if (campo === 'NIT') {
                 LanzarError('Ya existe un cliente con ese NIT en esta empresa', 400);
@@ -158,6 +156,11 @@ const Editar = async (codigo, datos, CodigoEmpresa) => {
             }
 
             LanzarError('Cliente duplicado', 400);
+        }
+
+        if (error.name === 'SequelizeValidationError') {
+            const errores = error.errors.map(e => e.message);
+            LanzarError(errores.join(', '), 400);
         }
 
         if (error.name === 'SequelizeDatabaseError') {
@@ -171,7 +174,6 @@ const Editar = async (codigo, datos, CodigoEmpresa) => {
         throw error;
     }
 };
-
 const Eliminar = async (codigo, CodigoEmpresa, SuperAdmin) => {
     try {
 
