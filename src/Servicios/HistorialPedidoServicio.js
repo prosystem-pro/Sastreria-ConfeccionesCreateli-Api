@@ -1063,11 +1063,9 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         if (datos.MontoPago > saldoAnterior)
             LanzarError('El monto excede el saldo pendiente', 400, 'Advertencia');
 
-        // ================= NUEVO SALDO =================
         const saldoPendiente = saldoAnterior - Number(datos.MontoPago);
 
-        // ================= GENERAR DOCUMENTO =================
-        // ✅ Enviar CodigoPedido para que la numeración sea por pedido
+        // ================= DOCUMENTO =================
         const documento = await GenerarDocumento(
             'PAGO',
             CodigoEmpresa,
@@ -1076,11 +1074,10 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         );
 
         if (!documento)
-            LanzarError(
-                'No se pudo generar el documento de pago',
-                500,
-                'Error'
-            );
+            LanzarError('No se pudo generar el documento de pago', 500, 'Error');
+
+        // ================= NORMALIZAR REFERENCIA =================
+        const referencia = datos.Referencia ?? null;
 
         // ================= CREAR PAGO =================
         const pago = await PagoModelo.create({
@@ -1100,7 +1097,9 @@ const RegistrarPagoPedido = async (datos, usuario) => {
             Monto: datos.MontoPago,
             FechaPago: new Date(),
 
-            NumeroComprobante: datos.Referencia || null,
+            // 🔥 AQUÍ SE GUARDA LA REFERENCIA (TARJETA / EFECTIVO / ETC)
+            NumeroComprobante: referencia,
+
             UrlImagen: datos.UrlImagen || null,
             Observacion: datos.Observacion || null,
 
@@ -1142,9 +1141,11 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         };
 
     } catch (error) {
+
         try {
             await transaccion.rollback();
         } catch (_) { }
+
         throw error;
     }
 };

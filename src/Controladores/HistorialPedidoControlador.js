@@ -36,7 +36,6 @@ const GenerarPDFPagoPedido = async (req, res) => {
   }
 };
 const ObtenerDatosImpresionPagoPedido = async (req, res) => {
-console.log('Esta llegando')
   try {
 
     const { CodigoPago } = req.params;
