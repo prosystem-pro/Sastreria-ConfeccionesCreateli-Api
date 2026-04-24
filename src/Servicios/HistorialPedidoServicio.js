@@ -885,6 +885,131 @@ const GenerarPDFPagoPedido = async (CodigoPago, res) => {
         LanzarError(error.message || 'Error al generar PDF de pago del pedido', error.statusCode || 500, 'Error');
     }
 };
+const ObtenerDatosImpresionPagoPedido = async (CodigoPago) => {
+
+    try {
+
+        if (!CodigoPago)
+            LanzarError('El código de pago es obligatorio', 400, 'Advertencia');
+
+        // ================= EMPRESA =================
+        const empresa = await EmpresaModelo.findOne({
+            where: { CodigoEmpresa: 1, Estatus: 1 }
+        });
+
+        if (!empresa)
+            LanzarError('Empresa no encontrada', 404);
+
+        // ================= PAGO APLICACIÓN =================
+        const pagoAplicacion = await PagoAplicacionModelo.findOne({
+            where: {
+                CodigoPago,
+                TipoDocumento: 'PEDIDO'
+            },
+            include: [{
+                model: PagoModelo,
+                as: 'FnPago',
+                where: { Estatus: 1 },
+                required: true
+            }]
+        });
+
+        if (!pagoAplicacion || !pagoAplicacion.FnPago)
+            LanzarError('Pago no encontrado', 404);
+
+        // ================= PEDIDO =================
+        const pedido = await ObtenerPedido(Number(pagoAplicacion.CodigoDocumento));
+
+        if (!pedido)
+            LanzarError('Pedido no encontrado', 404);
+
+        // ================= CLIENTE =================
+        const cliente = await ClienteModelo.findOne({
+            where: {
+                CodigoCliente: pedido.CodigoCliente,
+                Estatus: 1
+            }
+        });
+
+        if (!cliente)
+            LanzarError('Cliente no encontrado', 404);
+
+        // ================= FORMA DE PAGO =================
+        const formaPago = await FormaPago.findOne({
+            where: {
+                CodigoFormaPago: pagoAplicacion.FnPago.CodigoFormaPago
+            }
+        });
+
+        const nombreFormaPago = formaPago?.NombreFormaPago || 'Sin forma';
+
+        const monto = Number(pagoAplicacion.MontoAplicado || 0);
+
+        const referencia = pagoAplicacion.FnPago.NumeroComprobante || null;
+
+        const saldoAnterior = Number(pagoAplicacion.FnPago.SaldoAnterior || 0);
+        const saldoPendiente = Number(pagoAplicacion.FnPago.SaldoPendiente || 0);
+
+        const fechaPago = pagoAplicacion.FnPago.FechaPago
+            ? new Date(pagoAplicacion.FnPago.FechaPago).toLocaleDateString()
+            : new Date().toLocaleDateString();
+
+        const fechaEntrega = pedido.FechaEntrega
+            ? new Date(pedido.FechaEntrega).toLocaleDateString()
+            : '';
+
+        // ================= RETORNO =================
+        return {
+
+            empresa: {
+                nombre: empresa.NombreEmpresa,
+                nit: empresa.NIT,
+                direccion: empresa.Direccion,
+                telefono: empresa.Telefono,
+                logo: '/public/LogoConfeccionesCreateli.png'
+            },
+
+            cliente: {
+                nombre: cliente.NombreCliente,
+                nit: cliente.NIT || '',
+                direccion: cliente.Direccion || '',
+                celular: cliente.Celular || ''
+            },
+
+            pedido: {
+                documento: pedido.NumeroDocumento,
+                usuario: pedido.NombreUsuario,
+                fechaEntrega
+            },
+
+            pago: {
+                nombre: nombreFormaPago,
+                monto,
+                referencia
+            },
+
+            totales: {
+                saldoAnterior,
+                abono: monto,
+                saldoPendiente
+            },
+
+            fechaPago
+
+        };
+
+    } catch (error) {
+
+        console.error(error);
+
+        LanzarError(
+            error.message || 'Error al obtener datos de impresión de pago',
+            error.statusCode || 500,
+            'Error'
+        );
+    }
+};
+
 const RegistrarPagoPedido = async (datos, usuario) => {
 
     const transaccion = await BaseDatos.transaction();
@@ -2229,5 +2354,6 @@ module.exports = {
     Listado, Obtener, ListadoTipoProducto, ListadoTipoTela,
     ListadoTela, ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido, ListadoTipoCuello,
     ObtenerPedido, ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido,
-    EliminarPedido, ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido
+    EliminarPedido, ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido,
+    ObtenerDatosImpresionPagoPedido
 };

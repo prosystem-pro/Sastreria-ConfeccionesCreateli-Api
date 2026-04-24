@@ -7,7 +7,7 @@ const {  ObtenerDatosImpresion } = require('../Controladores/VentaControlador');
 const { Listado, Obtener, ListadoTipoProducto, ListadoTipoTela, ListadoTela, 
     ListadoProducto,ObtenerProducto,ListadoCliente, CrearPedido, ListadoTipoCuello, 
     ObtenerPedido,ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido, 
-    EliminarPedido, ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido } = require('../Controladores/HistorialPedidoControlador');
+    EliminarPedido, ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido, ObtenerDatosImpresionPagoPedido } = require('../Controladores/HistorialPedidoControlador');
 
 const VerificarToken = require('../FuncionIntermedia/VerificarToken');
 const VerificarPermisos = require('../FuncionIntermedia/VerificarPermisos');
@@ -43,4 +43,6 @@ Router.get(`/${Modelo}/pdf/:CodigoPedido`, VerificarToken, VerificarPermisos('Ge
 Router.get(`/${Modelo}/pdf-pago/:CodigoPedido`, VerificarToken, VerificarPermisos('GenerarPDFPagoPedido', Tabla), GenerarPDFPagoPedido);
 
 Router.get(`/${Modelo}/imprimir/:CodigoPedido`, VerificarToken, VerificarPermisos('ImprimirVenta', Tabla), ObtenerDatosImpresion);
+
+Router.get(`/${Modelo}/imprimir-pago/:CodigoPago`, VerificarToken, VerificarPermisos('ImprimirPagoPedido', Tabla), ObtenerDatosImpresionPagoPedido);
 module.exports = Router;

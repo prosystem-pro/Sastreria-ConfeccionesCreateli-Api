@@ -35,6 +35,39 @@ const GenerarPDFPagoPedido = async (req, res) => {
     );
   }
 };
+const ObtenerDatosImpresionPagoPedido = async (req, res) => {
+console.log('Esta llegando')
+  try {
+
+    const { CodigoPago } = req.params;
+
+    // ================= VALIDACIÓN =================
+    if (!CodigoPago || isNaN(CodigoPago)) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'El código de pago es obligatorio y debe ser numérico'
+      });
+    }
+
+    // ================= SERVICIO =================
+    const data = await Servicio.ObtenerDatosImpresionPagoPedido(
+      Number(CodigoPago)
+    );
+
+    return res.status(200).json({
+      ok: true,
+      data
+    });
+
+  } catch (error) {
+
+    return ManejarError(
+      error,
+      res,
+      'Error al obtener datos de impresión del pago del pedido'
+    );
+  }
+};
 
 const CrearPedido = async (req, res) => {
   try {
@@ -255,7 +288,7 @@ const ListadoEntregados = async (req, res) => {
       CodigoEmpresa,
       SuperAdmin,
       NombreEmpresa,
-      verOtros 
+      verOtros
     );
 
     return ResponderExito(
@@ -486,5 +519,5 @@ module.exports = {
   Listado, Obtener, ListadoTipoProducto, ListadoTipoTela, ListadoTela,
   ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido, ListadoTipoCuello, ObtenerPedido,
   ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido, EliminarPedido,
-  ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido
+  ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido, ObtenerDatosImpresionPagoPedido
 };
