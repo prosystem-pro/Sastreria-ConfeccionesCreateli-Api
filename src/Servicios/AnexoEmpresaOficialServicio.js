@@ -49,9 +49,6 @@ const ListadoPedidoPedidoEmpresaOficial = async ({ CodigoUsuario, CodigoRol }) =
         const CodigoEmpresaUsuario = usuario.CodigoEmpresa;
         const NombreRol = usuario.Rol?.NombreRol;
 
-        console.log('Empresa:', CodigoEmpresaUsuario);
-        console.log('Rol:', NombreRol);
-
         // 🔎 2. Filtro por empresa
         let filtroEmpresa = {};
 

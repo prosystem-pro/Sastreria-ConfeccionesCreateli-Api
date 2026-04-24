@@ -240,12 +240,11 @@ const { LanzarError } = require('../Utilidades/ErrorServicios');
 const { Op } = require('sequelize');
 
 const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
-    console.log('payload', datos)
+
     const transaccion = await BaseDatos.transaction();
 
     try {
 
-        // ================= VALIDACIONES =================
         if (!CodigoEmpresa)
             LanzarError('La empresa es obligatoria', 400);
 
@@ -254,26 +253,16 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
 
         if (!datos.Productos || datos.Productos.length === 0)
             LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
-        let fechaEntrega = null;
 
-        if (datos.FechaEntrega) {
-            fechaEntrega = new Date(datos.FechaEntrega);
-        }
+        let fechaEntrega = datos.FechaEntrega ? new Date(datos.FechaEntrega) : null;
 
-        // ================= GENERAR DOCUMENTO =================
-        const documentoPedido = await GenerarDocumento(
-            'PEDIDO',
-            CodigoEmpresa,
-            transaccion
-        );
+        const documentoPedido = await GenerarDocumento('PEDIDO', CodigoEmpresa, transaccion);
 
         if (!documentoPedido)
             LanzarError('No se pudo generar el documento del pedido', 500);
 
-        // ================= CREAR PEDIDO =================
         const pedido = await PedidoModelo.create({
-
-            CodigoEmpresa, // 🔥 ahora viene del token
+            CodigoEmpresa,
             CodigoCliente: datos.CodigoCliente,
             CodigoEstadoPedido: datos.CodigoEstadoPedido || 1,
             CodigoUsuario: usuario,
@@ -285,7 +274,6 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
 
             FechaCreacion: new Date(),
             FechaEntrega: fechaEntrega,
-
 
             Subtotal: datos.Subtotal,
             Descuento: datos.Descuento,
@@ -306,7 +294,6 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
             if (!esFisico && !esConfeccion)
                 LanzarError(`Tipo de producto no reconocido: ${tipoProducto}`, 400);
 
-            // 🔥 MISMA LÓGICA ORIGINAL (SIN FILTRAR POR EMPRESA)
             const inventario = await InventarioModelo.findOne({
                 where: {
                     CodigoProducto: producto.CodigoProducto,
@@ -323,7 +310,6 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
             let stockNuevo = null;
 
             if (esFisico) {
-
                 if (inventario.StockActual < producto.Cantidad)
                     LanzarError(`Stock insuficiente para el producto ${producto.CodigoProducto}`, 400);
 
@@ -332,7 +318,6 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
             }
 
             const detalle = await PedidoDetalleModelo.create({
-
                 CodigoPedido: pedido.CodigoPedido,
                 CodigoInventario: inventario.CodigoInventario,
 
@@ -350,20 +335,27 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
 
             }, { transaction: transaccion });
 
-            // ================= MEDIDAS =================
-            if (producto.Medidas) {
-                for (const key in producto.Medidas) {
+            // ================= MEDIDAS (RESTAURADO CORRECTO) =================
+            if (producto.Medidas && typeof producto.Medidas === 'object') {
 
-                    const valor = producto.Medidas[key];
+                for (const key of Object.keys(producto.Medidas)) {
+
+                    let valor = producto.Medidas[key];
+
                     if (valor === null || valor === undefined || valor === '')
                         continue;
+
+                    // convertir a número si aplica
+                    if (!isNaN(valor) && valor !== '')
+                        valor = Number(valor);
 
                     const tipoMedida = await TipoMedidaModelo.findOne({
                         where: { NombreTipoMedida: key },
                         transaction: transaccion
                     });
 
-                    if (!tipoMedida) continue;
+                    if (!tipoMedida)
+                        continue;
 
                     const esNumero = typeof valor === 'number';
 
@@ -385,8 +377,7 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
                 );
 
                 await MovimientoInventarioModelo.create({
-
-                    CodigoEmpresa, // 🔥 aquí sí aplica empresa
+                    CodigoEmpresa,
                     CodigoInventario: inventario.CodigoInventario,
                     CodigoUsuario: usuario,
 
@@ -408,62 +399,6 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
             }
         }
 
-        // ================= PAGO =================
-        if (datos.MontoPago && datos.FormaPago) {
-
-            const documentoPago = await GenerarDocumento(
-                'PAGO',
-                CodigoEmpresa,
-                transaccion,
-                pedido.CodigoPedido
-            );
-
-            if (!documentoPago)
-                LanzarError('No se pudo generar el documento de pago', 500);
-
-            const saldoAnterior = 0;
-            const saldoPendiente = Number(pedido.Total) - Number(datos.MontoPago);
-
-            const pago = await PagoModelo.create({
-
-                CodigoEmpresa,
-                CodigoUsuario: usuario,
-                CodigoFormaPago: datos.FormaPago,
-
-                Serie: documentoPago.Serie,
-                TipoDocumento: documentoPago.TipoDocumento,
-                NumeroDocumento: documentoPago.NumeroDocumento,
-                Numero: documentoPago.Numero,
-
-                SaldoAnterior: saldoAnterior,
-                SaldoPendiente: saldoPendiente,
-
-                Monto: datos.MontoPago,
-                FechaPago: new Date(),
-
-                NumeroComprobante: datos.Referencia || null,
-                UrlImagen: datos.UrlImagen || null,
-                Observacion: datos.Observacion || null,
-
-                Estatus: 1
-
-            }, { transaction: transaccion });
-
-            await PagoAplicacionModelo.create({
-
-                CodigoPago: pago.CodigoPago,
-
-                TipoDocumento: 'PEDIDO',
-                CodigoDocumento: pedido.CodigoPedido,
-                NumeroDocumento: documentoPedido.NumeroDocumento,
-
-                MontoAplicado: datos.MontoPago,
-                SaldoAnterior: saldoAnterior,
-                SaldoPendiente: saldoPendiente
-
-            }, { transaction: transaccion });
-        }
-
         await transaccion.commit();
 
         return {
@@ -473,12 +408,8 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
 
     } catch (error) {
 
-        try {
-            if (transaccion && !transaccion.finished) {
-                await transaccion.rollback();
-            }
-        } catch (rollbackError) {
-            console.error('Error en rollback:', rollbackError.message);
+        if (transaccion && !transaccion.finished) {
+            await transaccion.rollback();
         }
 
         throw error;
@@ -1106,6 +1037,7 @@ const ObtenerPedido = async (CodigoPedido) => {
             },
             attributes: [
                 'CodigoPedido',
+                'CodigoEmpresa',
                 'CodigoCliente',
                 'CodigoUsuario',
                 'NumeroDocumento',
@@ -1116,6 +1048,11 @@ const ObtenerPedido = async (CodigoPedido) => {
                 'Total'
             ],
             include: [
+                {
+                    model: EmpresaModelo,
+                    as: 'AdEmpresa',
+                    attributes: ['CodigoEmpresa', 'NombreEmpresa']
+                },
                 {
                     model: ClienteModelo,
                     as: 'CaCliente',
@@ -1156,7 +1093,6 @@ const ObtenerPedido = async (CodigoPedido) => {
 
         if (!pedido)
             LanzarError('Pedido no encontrado', 404, 'Advertencia');
-
 
         // ===================== DETALLES =====================
         const detalles = await PedidoDetalleModelo.findAll({
@@ -1216,7 +1152,6 @@ const ObtenerPedido = async (CodigoPedido) => {
             ]
         });
 
-
         const productos = [];
 
         for (const det of detalles) {
@@ -1239,6 +1174,7 @@ const ObtenerPedido = async (CodigoPedido) => {
             for (const m of medidasDB) {
 
                 const nombre = m.TipoMedidaDetalle?.NombreTipoMedida;
+
                 if (!nombre) continue;
 
                 if (m.Valor != null)
@@ -1250,30 +1186,23 @@ const ObtenerPedido = async (CodigoPedido) => {
             }
 
             productos.push({
-
                 CodigoProducto: det.Inventario?.Producto?.CodigoProducto || null,
                 NombreProducto: det.Inventario?.Producto?.NombreProducto || '',
                 CodigoTipoProducto: det.Inventario?.Producto?.TipoProducto?.CodigoTipoProducto || null,
                 NombreTipoProducto: det.Inventario?.Producto?.TipoProducto?.NombreTipoProducto || '',
-
                 CodigoTipoTela: det.CodigoTipoTela || null,
                 NombreTipoTela: det.TipoTela?.NombreTipoTela || '',
-
                 CodigoTela: det.CodigoTela || null,
                 NombreTela: det.Tela?.NombreTela || '',
-
                 Codigo: det.Codigo || null,
                 Color: det.Color || '',
                 Referencia: det.Referencia || '',
-
                 Cantidad: det.Cantidad || 0,
                 Precio: det.PrecioVenta || 0,
                 Subtotal: det.Subtotal || 0,
-
                 Medidas: medidas
             });
         }
-
 
         // ===================== PAGOS =====================
         const totalAbonado =
@@ -1285,33 +1214,30 @@ const ObtenerPedido = async (CodigoPedido) => {
         const saldoPendiente =
             (pedido.Total || 0) - totalAbonado;
 
-
         // ===================== RESPUESTA =====================
-        return {
-
+        const respuesta = {
             CodigoPedido: pedido.CodigoPedido,
+            CodigoEmpresa: pedido.CodigoEmpresa,
+            NombreEmpresa: pedido.AdEmpresa?.NombreEmpresa || '',
             NumeroDocumento: pedido.NumeroDocumento,
-
             CodigoCliente: pedido.CodigoCliente,
             NombreCliente: pedido.CaCliente?.NombreCliente || '',
-
             CodigoUsuario: pedido.CodigoUsuario,
             NombreUsuario: pedido.AdUsuario?.NombreUsuario || '',
-
             FechaEntrega: pedido.FechaEntrega,
             CodigoEstadoPedido: pedido.CodigoEstadoPedido,
             NombreEstadoPedido: pedido.CaEstadoPedido?.NombreEstadoPedido || '',
-
             Descuento: pedido.Descuento || 0,
             Subtotal: pedido.Subtotal || 0,
             Total: pedido.Total || 0,
-
             TotalAbonado: totalAbonado,
             SaldoPendiente: saldoPendiente,
-
             Pagos: pedido.PagosAplicados || [],
             Productos: productos
         };
+
+
+        return respuesta;
 
     } catch (error) {
 
@@ -1534,7 +1460,102 @@ const ListarPagosPorPedido = async (codigoPedido) => {
     }
 
 };
-const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa) => {
+// const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa) => {
+//     try {
+
+//         let where = {
+//             Estatus: { [Op.in]: [1, 2, 3, 4] }
+//         };
+
+//         if (!SuperAdmin) {
+//             where.CodigoEmpresa = CodigoEmpresa;
+//         }
+
+//         const pedidos = await PedidoModelo.findAll({
+//             where,
+//             attributes: [
+//                 'CodigoPedido',
+//                 'CodigoEmpresa',
+//                 'FechaCreacion',
+//                 'FechaEntrega',
+//                 'Subtotal',
+//                 'Descuento',
+//                 'Total'
+//             ],
+//             include: [
+//                 {
+//                     model: ClienteModelo,
+//                     as: 'CaCliente',
+//                     attributes: ['NombreCliente']
+//                 },
+//                 {
+//                     model: EstadoPedidoModelo,
+//                     as: 'CaEstadoPedido',
+//                     attributes: ['CodigoEstadoPedido', 'NombreEstadoPedido'],
+//                     where: {
+//                         NombreEstadoPedido: 'ENTREGADO'
+//                     }
+//                 },
+//                 {
+//                     model: UsuarioModelo,
+//                     as: 'AdUsuario',
+//                     attributes: ['NombreUsuario']
+//                 }
+//             ],
+//             order: [['FechaCreacion', 'DESC']]
+//         });
+
+//         const resultado = [];
+
+//         for (const p of pedidos) {
+
+//             const Total = Number(p.Total || 0);
+
+//             const pagos = await PagoAplicacionModelo.findAll({
+//                 where: {
+//                     TipoDocumento: 'PEDIDO',
+//                     CodigoDocumento: p.CodigoPedido
+//                 },
+//                 attributes: ['MontoAplicado']
+//             });
+
+//             const TotalPagado = pagos.reduce(
+//                 (sum, pago) => sum + Number(pago.MontoAplicado),
+//                 0
+//             );
+
+//             const SaldoPendiente = Total - TotalPagado;
+
+//             resultado.push({
+//                 CodigoPedido: p.CodigoPedido,
+//                 CodigoEmpresa: p.CodigoEmpresa,
+//                 NombreEmpresa: NombreEmpresa, // 👈 CONSISTENCIA CON OTROS SERVICIOS
+
+//                 NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
+//                 FechaCreacion: p.FechaCreacion,
+//                 FechaEntrega: p.FechaEntrega,
+//                 Subtotal: p.Subtotal,
+//                 Descuento: p.Descuento,
+//                 Total: Total,
+//                 NombreEstatus: p.CaEstadoPedido?.NombreEstadoPedido || 'Sin estado',
+//                 Estatus: p.CaEstadoPedido?.CodigoEstadoPedido || 0,
+//                 Usuario: p.AdUsuario?.NombreUsuario || 'Sin usuario',
+//                 TotalPagado: TotalPagado,
+//                 SaldoPendiente: SaldoPendiente < 0 ? 0 : SaldoPendiente
+//             });
+//         }
+
+//         return resultado;
+
+//     } catch (error) {
+
+//         if (error.statusCode) throw error;
+
+//         LanzarError('Error al obtener pedidos entregados', 500);
+//     }
+// };
+
+const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false) => {
     try {
 
         let where = {
@@ -1542,7 +1563,16 @@ const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa) => {
         };
 
         if (!SuperAdmin) {
-            where.CodigoEmpresa = CodigoEmpresa;
+
+            if (verOtros) {
+                // 🔥 TRAE TODAS MENOS LA MÍA
+                where.CodigoEmpresa = {
+                    [Op.ne]: CodigoEmpresa
+                };
+            } else {
+                // 🔹 NORMAL
+                where.CodigoEmpresa = CodigoEmpresa;
+            }
         }
 
         const pedidos = await PedidoModelo.findAll({
@@ -1603,8 +1633,7 @@ const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa) => {
             resultado.push({
                 CodigoPedido: p.CodigoPedido,
                 CodigoEmpresa: p.CodigoEmpresa,
-                NombreEmpresa: NombreEmpresa, // 👈 CONSISTENCIA CON OTROS SERVICIOS
-
+                NombreEmpresa: NombreEmpresa,
                 NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
                 FechaCreacion: p.FechaCreacion,
                 FechaEntrega: p.FechaEntrega,
@@ -1797,7 +1826,7 @@ const ActualizarPedido = async (datos, usuario) => {
         throw error;
     }
 };
-const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa) => {
+const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false) => {
     try {
 
         let where = {
@@ -1805,7 +1834,16 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa) => {
         };
 
         if (!SuperAdmin) {
-            where.CodigoEmpresa = CodigoEmpresa;
+
+            if (verOtros) {
+                // 🔥 TRAE TODAS MENOS LA MÍA
+                where.CodigoEmpresa = {
+                    [Op.ne]: CodigoEmpresa
+                };
+            } else {
+                // 🔹 NORMAL (como siempre)
+                where.CodigoEmpresa = CodigoEmpresa;
+            }
         }
 
         const pedidos = await PedidoModelo.findAll({
@@ -1868,7 +1906,7 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa) => {
             resultado.push({
                 CodigoPedido: p.CodigoPedido,
                 CodigoEmpresa: p.CodigoEmpresa,
-                NombreEmpresa: NombreEmpresa, // 👈 AQUÍ
+                NombreEmpresa: NombreEmpresa,
                 NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
                 FechaCreacion: p.FechaCreacion,
                 FechaEntrega: p.FechaEntrega,
@@ -2009,62 +2047,6 @@ const ListadoTipoProducto = async () => {
     }
 
 };
-// const ListadoProducto = async (CodigoTipoProducto = null) => {
-//     try {
-
-//         const whereProducto = {
-//             Estatus: 1
-//         };
-
-//         if (CodigoTipoProducto) {
-//             whereProducto.CodigoTipoProducto = CodigoTipoProducto;
-//         }
-
-//         const productos = await ProductoModelo.findAll({
-
-//             where: whereProducto,
-
-//             include: [
-//                 {
-//                     model: InventarioModelo,
-//                     as: 'Inventarios',
-//                     attributes: [],
-//                     required: true
-//                 }
-//             ],
-
-//             attributes: [
-//                 'CodigoProducto',
-//                 'NombreProducto',
-//                 'CodigoTipoProducto',
-//                 [Sequelize.fn('SUM', Sequelize.col('Inventarios.StockActual')), 'StockActual']
-//             ],
-
-//             group: [
-//                 'Producto.CodigoProducto',
-//                 'Producto.NombreProducto',
-//                 'Producto.CodigoTipoProducto'
-//             ],
-
-//             order: [
-//                 ['NombreProducto', 'ASC']
-//             ],
-
-//             raw: true
-//         });
-
-//         return productos.map(p => ({
-//             CodigoProducto: p.CodigoProducto,
-//             NombreProducto: p.NombreProducto,
-//             CodigoTipoProducto: p.CodigoTipoProducto,
-//             StockActual: Number(p.StockActual) || 0
-//         }));
-
-//     } catch (error) {
-//         console.error(error);
-//         LanzarError('Error al obtener productos', 500, 'Error');
-//     }
-// };
 const ListadoProducto = async (CodigoTipoProducto = null) => {
     try {
 

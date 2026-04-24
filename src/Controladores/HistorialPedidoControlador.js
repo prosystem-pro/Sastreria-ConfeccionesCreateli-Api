@@ -5,35 +5,35 @@ const ManejarError = require('../Utilidades/ErrorControladores');
 const ResponderExito = require('../Utilidades/RespuestaExitosaControlador');
 
 const GenerarPDFPedido = async (req, res) => {
-    try {
-        const { CodigoPedido } = req.params;
+  try {
+    const { CodigoPedido } = req.params;
 
-        await Servicio.GenerarPDFPedido(Number(CodigoPedido), res);
+    await Servicio.GenerarPDFPedido(Number(CodigoPedido), res);
 
-        // No hace falta res.download ni retornar nada, el PDF ya se envía
+    // No hace falta res.download ni retornar nada, el PDF ya se envía
 
-    } catch (error) {
-        return ManejarError(error, res, 'Error al generar el PDF del pedido');
-    }
+  } catch (error) {
+    return ManejarError(error, res, 'Error al generar el PDF del pedido');
+  }
 };
 const GenerarPDFPagoPedido = async (req, res) => {
-    try {
+  try {
 
-        const { CodigoPedido } = req.params;
+    const { CodigoPedido } = req.params;
 
-        await Servicio.GenerarPDFPagoPedido(
-            Number(CodigoPedido),
-            res
-        );
+    await Servicio.GenerarPDFPagoPedido(
+      Number(CodigoPedido),
+      res
+    );
 
-    } catch (error) {
+  } catch (error) {
 
-        return ManejarError(
-            error,
-            res,
-            'Error al generar el PDF de pago del pedido'
-        );
-    }
+    return ManejarError(
+      error,
+      res,
+      'Error al generar el PDF de pago del pedido'
+    );
+  }
 };
 
 const CrearPedido = async (req, res) => {
@@ -224,7 +224,14 @@ const Listado = async (req, res) => {
 
     const { CodigoEmpresa, SuperAdmin, NombreEmpresa } = req.Datos;
 
-    const Objeto = await Servicio.Listado(CodigoEmpresa, SuperAdmin, NombreEmpresa);
+    const verOtros = req.query.verOtros === 'true';
+
+    const Objeto = await Servicio.Listado(
+      CodigoEmpresa,
+      SuperAdmin,
+      NombreEmpresa,
+      verOtros
+    );
 
     return ResponderExito(
       res,
@@ -242,10 +249,13 @@ const ListadoEntregados = async (req, res) => {
 
     const { CodigoEmpresa, SuperAdmin, NombreEmpresa } = req.Datos;
 
+    const verOtros = req.query.verOtros === 'true';
+
     const Objeto = await Servicio.ListadoEntregados(
       CodigoEmpresa,
       SuperAdmin,
-      NombreEmpresa
+      NombreEmpresa,
+      verOtros 
     );
 
     return ResponderExito(
@@ -473,8 +483,8 @@ const ListadoFormaPago = async (req, res) => {
 
 
 module.exports = {
-  Listado, Obtener, ListadoTipoProducto, ListadoTipoTela, ListadoTela, 
-  ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido,ListadoTipoCuello, ObtenerPedido,
-  ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido, EliminarPedido, 
+  Listado, Obtener, ListadoTipoProducto, ListadoTipoTela, ListadoTela,
+  ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido, ListadoTipoCuello, ObtenerPedido,
+  ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido, EliminarPedido,
   ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido
 };
