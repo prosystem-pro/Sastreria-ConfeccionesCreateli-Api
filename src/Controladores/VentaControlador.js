@@ -6,11 +6,11 @@ const ResponderExito = require('../Utilidades/RespuestaExitosaControlador');
 // =============================
 // OBTENER DATOS IMPRESION VENTA
 // =============================
-const ObtenerDatosImpresionVenta = async (req, res) => {
+const ObtenerDatosImpresion = async (req, res) => {
     try {
         const { CodigoPedido } = req.params;
 
-        const datos = await Servicio.ObtenerDatosImpresionVenta(CodigoPedido);
+        const datos = await Servicio.ObtenerDatosImpresion(CodigoPedido);
 
         return ResponderExito(
             res,
@@ -169,5 +169,5 @@ const EliminarVenta = async (req, res) => {
 };
 
 module.exports = {
-    ListadoProducto, CrearVenta, ListadoVentas, EliminarVenta,GenerarPDFVenta, ObtenerDatosImpresionVenta
+    ListadoProducto, CrearVenta, ListadoVentas, EliminarVenta,GenerarPDFVenta, ObtenerDatosImpresion
 };
