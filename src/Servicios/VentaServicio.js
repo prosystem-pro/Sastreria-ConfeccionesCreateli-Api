@@ -24,7 +24,9 @@ const {
 const { Op } = require('sequelize');
 const { LanzarError } = require('../Utilidades/ErrorServicios');
 const ObtenerDatosImpresion = async (CodigoPedido) => {
+
     try {
+
         if (!CodigoPedido)
             LanzarError('El código de venta es obligatorio', 400, 'Advertencia');
 
@@ -32,11 +34,15 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
         const empresa = await EmpresaModelo.findOne({
             where: { CodigoEmpresa: 1, Estatus: 1 }
         });
-        if (!empresa) LanzarError('Empresa no encontrada', 404);
 
-        // ================= VENTA =================
+        if (!empresa)
+            LanzarError('Empresa no encontrada', 404);
+
+        // ================= VENTA / PEDIDO =================
         const venta = await ObtenerVenta(Number(CodigoPedido));
-        if (!venta) LanzarError('Venta no encontrada', 404);
+
+        if (!venta)
+            LanzarError('Venta no encontrada', 404);
 
         // ================= CLIENTE =================
         const cliente = await ClienteModelo.findOne({
@@ -45,12 +51,15 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
                 Estatus: 1
             }
         });
-        if (!cliente) LanzarError('Cliente no encontrado', 404);
+
+        if (!cliente)
+            LanzarError('Cliente no encontrado', 404);
 
         // ================= FORMAS DE PAGO =================
         const formasPagoDB = await FormaPago.findAll({
             attributes: ['CodigoFormaPago', 'NombreFormaPago']
         });
+
         const mapaFormaPago = {};
         formasPagoDB.forEach(f => {
             mapaFormaPago[f.CodigoFormaPago] = f.NombreFormaPago;
@@ -72,29 +81,50 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
             ]
         });
 
+        // ================= ABONOS =================
+        let Abono = 0;
+
+        pagosDB.forEach(p => {
+            Abono += Number(p.MontoAplicado || 0);
+        });
+
+        // ================= CLASIFICAR PAGOS =================
         let tarjetaPago = null;
         let otroPago = null;
 
         pagosDB.forEach(p => {
-            const nombreFormaPago = mapaFormaPago[p.FnPago?.CodigoFormaPago] || 'Sin forma';
+
+            const nombreFormaPago =
+                mapaFormaPago[p.FnPago?.CodigoFormaPago] || 'Sin forma';
+
             if (nombreFormaPago.toLowerCase().includes('tarjeta')) {
+
                 tarjetaPago = {
                     nombre: nombreFormaPago,
                     monto: Number(p.MontoAplicado || 0),
                     numeroComprobante: p.FnPago?.NumeroComprobante || null
                 };
+
             } else {
+
                 otroPago = {
                     nombre: nombreFormaPago,
                     monto: Number(p.MontoAplicado || 0)
                 };
+
             }
+
         });
+
+        // ================= TOTALES =================
+        const Total = Number(venta.Total || 0);
+        const SaldoPendiente = Total - Abono;
 
         const fechaVenta = new Date().toLocaleDateString();
 
-        // ================= RETORNAR DATOS PUROS =================
+        // ================= RETORNO FINAL =================
         return {
+
             empresa: {
                 nombre: empresa.NombreEmpresa,
                 nit: empresa.NIT,
@@ -102,34 +132,45 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
                 telefono: empresa.Telefono,
                 logo: '/public/LogoConfeccionesCreateli.png'
             },
+
             cliente: {
                 nombre: cliente.NombreCliente,
                 nit: cliente.NIT || '',
                 direccion: cliente.Direccion || '',
                 celular: cliente.Celular || ''
             },
+
             venta: {
                 documento: venta.NumeroDocumento,
                 fecha: fechaVenta,
                 usuario: venta.NombreUsuario,
                 estado: 'VENTA'
             },
+
             productos: venta.Productos.map(p => ({
                 cantidad: p.Cantidad,
                 nombre: p.NombreProducto,
                 subtotal: p.Subtotal
             })),
+
             pago: tarjetaPago || otroPago,
             referencia: tarjetaPago?.numeroComprobante || null,
+
+            // ================= TOTALES ORDENADOS =================
             totales: {
-                subtotal: venta.Subtotal,
-                descuento: venta.Descuento,
-                total: venta.Total
+                subtotal: Number(venta.Subtotal || 0),
+                descuento: Number(venta.Descuento || 0),
+                abono: Abono,
+                saldoPendiente: SaldoPendiente,
+                total: Total
             }
+
         };
 
     } catch (error) {
+
         console.error(error);
+
         LanzarError(
             error.message || 'Error al obtener datos de impresión',
             error.statusCode || 500,
