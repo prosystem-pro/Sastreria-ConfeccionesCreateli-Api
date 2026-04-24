@@ -32,19 +32,50 @@ const Crear = async (datos, CodigoEmpresa) => {
             NIT: datos.NIT,
             Celular: datos.Celular,
             Direccion: datos.Direccion,
+            Correo: datos.Correo || null,
             Estatus: 1,
-            CodigoEmpresa: CodigoEmpresa // 🔥 viene del token
+            CodigoEmpresa: CodigoEmpresa
         });
 
         return registro;
 
     } catch (error) {
 
-        if (error.name === 'SequelizeUniqueConstraintError') {
-            LanzarError('El cliente ya existe (NIT duplicado)', 400);
+        if (error.name === 'SequelizeValidationError') {
+            const errores = error.errors
+                .filter(e => e.validatorKey === 'not_null')
+                .map(e => `El campo ${e.path} es obligatorio`);
+
+            if (errores.length > 0) {
+                LanzarError(errores.join(', '), 400);
+            }
+
+            const otros = error.errors.map(e => e.message);
+            LanzarError(otros.join(', '), 400);
         }
 
-        LanzarError('Error al crear cliente', 500);
+        if (error.name === 'SequelizeUniqueConstraintError') {
+
+            const campo = error.errors[0].path;
+
+            if (campo === 'NIT') {
+                LanzarError('Ya existe un cliente con ese NIT en esta empresa', 400);
+            }
+
+            if (campo === 'NombreCliente') {
+                LanzarError('Ya existe un cliente con ese nombre en esta empresa', 400);
+            }
+
+            LanzarError('Cliente duplicado', 400);
+        }
+
+        if (error.name === 'SequelizeDatabaseError') {
+            if (error.parent?.message.includes('NULL')) {
+                LanzarError('Faltan campos obligatorios', 400);
+            }
+        }
+
+        throw error;
     }
 };
 
@@ -70,7 +101,8 @@ const Obtener = async (codigo, CodigoEmpresa, SuperAdmin) => {
 
     } catch (error) {
         if (error.statusCode) throw error;
-        LanzarError('Error al obtener cliente', 500);
+
+        throw error;
     }
 };
 
@@ -92,20 +124,51 @@ const Editar = async (codigo, datos, CodigoEmpresa) => {
             NombreCliente: datos.NombreCliente,
             NIT: datos.NIT,
             Celular: datos.Celular,
-            Direccion: datos.Direccion
+            Direccion: datos.Direccion,
+            Correo: datos.Correo ?? null // opcional
         });
 
         return registro;
 
     } catch (error) {
 
+        if (error.name === 'SequelizeValidationError') {
+            const errores = error.errors
+                .filter(e => e.validatorKey === 'not_null')
+                .map(e => `El campo ${e.path} es obligatorio`);
+
+            if (errores.length > 0) {
+                LanzarError(errores.join(', '), 400);
+            }
+
+            const otros = error.errors.map(e => e.message);
+            LanzarError(otros.join(', '), 400);
+        }
+
         if (error.name === 'SequelizeUniqueConstraintError') {
-            LanzarError('Ya existe un cliente con ese NIT', 400);
+
+            const campo = error.errors[0].path;
+
+            if (campo === 'NIT') {
+                LanzarError('Ya existe un cliente con ese NIT en esta empresa', 400);
+            }
+
+            if (campo === 'NombreCliente') {
+                LanzarError('Ya existe un cliente con ese nombre en esta empresa', 400);
+            }
+
+            LanzarError('Cliente duplicado', 400);
+        }
+
+        if (error.name === 'SequelizeDatabaseError') {
+            if (error.parent?.message.includes('NULL')) {
+                LanzarError('Faltan campos obligatorios', 400);
+            }
         }
 
         if (error.statusCode) throw error;
 
-        LanzarError('Error al editar cliente', 500);
+        throw error;
     }
 };
 
@@ -133,15 +196,14 @@ const Eliminar = async (codigo, CodigoEmpresa, SuperAdmin) => {
     } catch (error) {
 
         if (error.name === 'SequelizeForeignKeyConstraintError') {
-            LanzarError('No se puede eliminar el cliente porque tiene pedidos asociados', 400);
+            LanzarError('No se puede eliminar el cliente porque tiene registros asociados', 400);
         }
 
         if (error.statusCode) throw error;
 
-        LanzarError('Error al eliminar cliente', 500);
+        throw error;
     }
 };
-
 
 module.exports = {
     Listado, Crear, Editar, Eliminar, Obtener

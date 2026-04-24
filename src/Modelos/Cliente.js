@@ -9,11 +9,12 @@ module.exports = function(sequelize, DataTypes) {
     },
     CodigoEmpresa: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'Empresa',
         key: 'CodigoEmpresa'
-      }
+      },
+      unique: "Uq_CaCliente_NombreCliente"
     },
     NombreCliente: {
       type: DataTypes.STRING(64),
@@ -22,16 +23,16 @@ module.exports = function(sequelize, DataTypes) {
     },
     NIT: {
       type: DataTypes.STRING(16),
-      allowNull: true,
+      allowNull: false,
       unique: "Uq_CaCliente_NIT"
     },
     Celular: {
       type: DataTypes.STRING(256),
-      allowNull: true
+      allowNull: false
     },
     Direccion: {
       type: DataTypes.STRING(256),
-      allowNull: true
+      allowNull: false
     },
     Correo: {
       type: DataTypes.STRING(256),
@@ -39,7 +40,7 @@ module.exports = function(sequelize, DataTypes) {
     },
     Estatus: {
       type: DataTypes.TINYINT,
-      allowNull: true,
+      allowNull: false,
       defaultValue: 1
     }
   }, {
@@ -59,6 +60,7 @@ module.exports = function(sequelize, DataTypes) {
         name: "Uq_CaCliente_NIT",
         unique: true,
         fields: [
+          { name: "CodigoEmpresa" },
           { name: "NIT" },
         ]
       },
@@ -66,6 +68,7 @@ module.exports = function(sequelize, DataTypes) {
         name: "Uq_CaCliente_NombreCliente",
         unique: true,
         fields: [
+          { name: "CodigoEmpresa" },
           { name: "NombreCliente" },
         ]
       },
