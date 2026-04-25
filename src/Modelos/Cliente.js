@@ -27,7 +27,7 @@ module.exports = function(sequelize, DataTypes) {
       unique: "Uq_CaCliente_NIT"
     },
     Celular: {
-      type: DataTypes.STRING(256),
+      type: DataTypes.STRING(8),
       allowNull: false
     },
     Direccion: {
