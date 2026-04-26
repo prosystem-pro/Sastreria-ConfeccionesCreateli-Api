@@ -23,8 +23,7 @@ module.exports = function(sequelize, DataTypes) {
     },
     NIT: {
       type: DataTypes.STRING(16),
-      allowNull: false,
-      unique: "Uq_CaCliente_NIT"
+      allowNull: true
     },
     Celular: {
       type: DataTypes.STRING(8),
@@ -54,14 +53,6 @@ module.exports = function(sequelize, DataTypes) {
         unique: true,
         fields: [
           { name: "CodigoCliente" },
-        ]
-      },
-      {
-        name: "Uq_CaCliente_NIT",
-        unique: true,
-        fields: [
-          { name: "CodigoEmpresa" },
-          { name: "NIT" },
         ]
       },
       {
