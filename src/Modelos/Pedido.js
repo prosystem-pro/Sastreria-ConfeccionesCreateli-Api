@@ -63,7 +63,7 @@ module.exports = function(sequelize, DataTypes) {
       allowNull: true
     },
     FechaEntrega: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATEONLY,
       allowNull: true
     },
     Subtotal: {
