@@ -3,7 +3,7 @@ const BaseDatos = require('../BaseDatos/ConexionBaseDatos');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
-const { formatearFechaHora, formatearSoloFecha } = require('../Utilidades/FechaGuatemala');
+const { FormatearFechaHora, FormatearSoloFecha, ConvertirFechaSimpleAUTC } = require('../Utilidades/ConversionFechas');
 
 
 const { PedidoModelo, ClienteModelo, EstadoPedidoModelo, UsuarioModelo,
@@ -240,7 +240,7 @@ const { LanzarError } = require('../Utilidades/ErrorServicios');
 const { Op } = require('sequelize');
 
 const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
-
+    console.log('PAYLOAD CREAR PEDIDO', datos)
     const transaccion = await BaseDatos.transaction();
 
     try {
@@ -254,7 +254,7 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
         if (!datos.Productos || datos.Productos.length === 0)
             LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
 
-        let fechaEntrega = datos.FechaEntrega ? new Date(datos.FechaEntrega) : null;
+        let fechaEntrega = datos.FechaEntrega || null;
 
         const documentoPedido = await GenerarDocumento('PEDIDO', CodigoEmpresa, transaccion);
 
@@ -1939,8 +1939,8 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = fals
                 CodigoEmpresa: p.CodigoEmpresa,
                 NombreEmpresa: NombreEmpresa,
                 NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
-                FechaCreacion: formatearFechaHora(p.FechaCreacion),
-                FechaEntrega: formatearSoloFecha(p.FechaEntrega),   
+                FechaCreacion: FormatearFechaHora(p.FechaCreacion),
+                FechaEntrega: FormatearSoloFecha(p.FechaEntrega),
                 Subtotal: p.Subtotal,
                 Descuento: p.Descuento,
                 Total: Total,

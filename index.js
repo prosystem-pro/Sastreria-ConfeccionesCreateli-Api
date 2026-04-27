@@ -1,5 +1,10 @@
 // const sequelize = require('./src/BaseDatos/ConexionBaseDatos');
 require('dotenv').config();
+// process.env.TZ = 'UTC';
+// 🔥 AQUÍ
+console.log('TZ env:', process.env.TZ);
+console.log('Offset:', new Date().getTimezoneOffset());
+console.log('Timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
 
 require('./src/Relaciones/Relaciones'); 
 
