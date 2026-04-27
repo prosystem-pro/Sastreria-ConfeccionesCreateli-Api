@@ -3,7 +3,7 @@ const BaseDatos = require('../BaseDatos/ConexionBaseDatos');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
-
+const { formatearFechaHora, formatearSoloFecha } = require('../Utilidades/FechaGuatemala');
 
 
 const { PedidoModelo, ClienteModelo, EstadoPedidoModelo, UsuarioModelo,
@@ -1939,8 +1939,8 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = fals
                 CodigoEmpresa: p.CodigoEmpresa,
                 NombreEmpresa: NombreEmpresa,
                 NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
-                FechaCreacion: p.FechaCreacion,
-                FechaEntrega: p.FechaEntrega,
+                FechaCreacion: formatearFechaHora(p.FechaCreacion),
+                FechaEntrega: formatearSoloFecha(p.FechaEntrega),   
                 Subtotal: p.Subtotal,
                 Descuento: p.Descuento,
                 Total: Total,
