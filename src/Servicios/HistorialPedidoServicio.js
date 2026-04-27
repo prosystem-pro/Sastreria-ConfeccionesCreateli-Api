@@ -3,7 +3,10 @@ const BaseDatos = require('../BaseDatos/ConexionBaseDatos');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
-const { FormatearFechaHora, FormatearSoloFecha, ConvertirFechaSimpleAUTC } = require('../Utilidades/ConversionFechas');
+const { UTCAGuatemala_FechaHora,
+    FormatoFecha,
+    GuatemalaAUTC,
+    FormatoFechaDesdeDateTime } = require('../Utilidades/ConversionFechas');
 
 
 const { PedidoModelo, ClienteModelo, EstadoPedidoModelo, UsuarioModelo,
@@ -240,7 +243,6 @@ const { LanzarError } = require('../Utilidades/ErrorServicios');
 const { Op } = require('sequelize');
 
 const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
-    console.log('PAYLOAD CREAR PEDIDO', datos)
     const transaccion = await BaseDatos.transaction();
 
     try {
@@ -1939,8 +1941,8 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = fals
                 CodigoEmpresa: p.CodigoEmpresa,
                 NombreEmpresa: NombreEmpresa,
                 NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
-                FechaCreacion: FormatearFechaHora(p.FechaCreacion),
-                FechaEntrega: FormatearSoloFecha(p.FechaEntrega),
+                FechaCreacion: UTCAGuatemala_FechaHora(p.FechaCreacion),
+                FechaEntrega: FormatoFecha(p.FechaEntrega),
                 Subtotal: p.Subtotal,
                 Descuento: p.Descuento,
                 Total: Total,

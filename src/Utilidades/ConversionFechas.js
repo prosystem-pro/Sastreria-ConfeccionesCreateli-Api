@@ -47,5 +47,6 @@ const FormatoFechaDesdeDateTime = (fecha) => {
 module.exports = {
     GuatemalaAUTC,
     UTCAGuatemala_FechaHora,
-    FormatoFecha
+    FormatoFecha,
+    FormatoFechaDesdeDateTime
 };
