@@ -22,6 +22,7 @@ const VentaRuta = require("./Rutas/VentaRuta");
 const ConfiguracionRuta = require("./Rutas/ConfiguracionRuta");
 const ReporteRuta = require("./Rutas/ReporteRuta");
 const AnexoEmpresaOficialRuta = require("./Rutas/AnexoEmpresaOficialRuta");
+const GestionSuperAdminRuta = require("./Rutas/GestionSuperAdmin-Ruta");
 
 const Ruter = 'api';
 const CuerpoJson = require('./FuncionIntermedia/CuerpoJson');
@@ -55,5 +56,6 @@ App.use(`/${Ruter}`, VentaRuta);
 App.use(`/${Ruter}`, ConfiguracionRuta);
 App.use(`/${Ruter}`, ReporteRuta);
 App.use(`/${Ruter}`, AnexoEmpresaOficialRuta);
+App.use(`/${Ruter}`, GestionSuperAdminRuta);
 
 module.exports = App;
