@@ -15,12 +15,7 @@ const LimpiarBaseDatosPruebas = async (req, res) => {
       LanzarError('No autorizado para ejecutar limpieza de base de datos', 403);
     }
 
-    // 🔥 Protección adicional (muy recomendada)
-    if (process.env.NODE_ENV === 'production') {
-      LanzarError('No se permite limpiar la base de datos en producción', 403);
-    }
-
-    const Resultado = await Servicio.LimpiarBaseDatosPruebas(SuperAdmin);
+     const Resultado = await Servicio.LimpiarBaseDatosPruebas(SuperAdmin);
 
     return ResponderExito(
       res,
