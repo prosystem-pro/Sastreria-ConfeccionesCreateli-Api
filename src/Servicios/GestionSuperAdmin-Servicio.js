@@ -8,12 +8,6 @@ const LimpiarBaseDatosPruebas = async (SuperAdmin) => {
 
     try {
 
-        // 🔒 Seguridad
-        if (!SuperAdmin) {
-            LanzarError('No autorizado para ejecutar limpieza de base de datos', 403);
-        }
-
-        // 🧹 DELETE (orden hijo → padre)
         const deletes = [
 
             'DELETE FROM Op.PedidoDetalleMedida',
@@ -45,7 +39,6 @@ const LimpiarBaseDatosPruebas = async (SuperAdmin) => {
             'DELETE FROM Ca.Categoria'
         ];
 
-        // 🔁 RESEED (reinicio de identity)
         const reseeds = [
 
             'DBCC CHECKIDENT (\'Op.PedidoDetalleMedida\', RESEED, 0)',
@@ -77,12 +70,10 @@ const LimpiarBaseDatosPruebas = async (SuperAdmin) => {
             'DBCC CHECKIDENT (\'Ca.Categoria\', RESEED, 0)'
         ];
 
-        // 🧹 1. DELETE
         for (const query of deletes) {
             await BaseDatos.query(query, { transaction });
         }
 
-        // 🔁 2. RESEED (SIN SILENCIAR ERRORES)
         for (const query of reseeds) {
             await BaseDatos.query(query, { transaction });
         }
@@ -95,10 +86,8 @@ const LimpiarBaseDatosPruebas = async (SuperAdmin) => {
 
     } catch (error) {
 
-        // ❗ rollback siempre
         await transaction.rollback();
 
-        // 🔥 ERROR REAL (NO SE OCULTA)
         throw error;
     }
 };
