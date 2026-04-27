@@ -20,6 +20,10 @@ const {
     UsuarioModelo,
     ClienteModelo
 } = require('../Relaciones/Relaciones');
+const { UTCAGuatemala_FechaHora,
+    FormatoFecha,
+    GuatemalaAUTC,
+    FormatoFechaDesdeDateTime } = require('../Utilidades/ConversionFechas');
 
 const { Op } = require('sequelize');
 const { LanzarError } = require('../Utilidades/ErrorServicios');
@@ -40,6 +44,7 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
 
         // ================= VENTA / PEDIDO =================
         const venta = await ObtenerVenta(Number(CodigoPedido));
+        console.log('VENTA', venta)
 
         if (!venta)
             LanzarError('Venta no encontrada', 404);
@@ -69,7 +74,7 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
         const pagosDB = await PagoAplicacionModelo.findAll({
             where: {
                 CodigoDocumento: CodigoPedido,
-                TipoDocumento: 'VENTA'
+                TipoDocumento: ['VENTA', 'PEDIDO']
             },
             include: [
                 {
@@ -120,8 +125,26 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
         const Total = Number(venta.Total || 0);
         const SaldoPendiente = Total - Abono;
 
-        const fechaVenta = new Date().toLocaleDateString();
+        // const fechaVenta = new Date().toLocaleDateString();
 
+
+
+
+        console.log('📦 RETURN COMPLETO:', JSON.stringify({
+            empresa,
+            cliente,
+            venta,
+            productos: venta.Productos,
+            pago: tarjetaPago || otroPago,
+            referencia: tarjetaPago?.numeroComprobante || null,
+            totales: {
+                subtotal: Number(venta.Subtotal || 0),
+                descuento: Number(venta.Descuento || 0),
+                abono: Abono,
+                saldoPendiente: SaldoPendiente,
+                total: Total
+            }
+        }, null, 2));
         // ================= RETORNO FINAL =================
         return {
 
@@ -142,7 +165,14 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
 
             venta: {
                 documento: venta.NumeroDocumento,
-                fecha: fechaVenta,
+                // fecha: fechaVenta,
+
+                fecha: venta.FechaCreacion
+                    ? UTCAGuatemala_FechaHora(venta.FechaCreacion)
+                    : null,
+                fechaEntrega: venta.FechaEntrega
+                    ? FormatoFecha(venta.FechaEntrega)
+                    : '',
                 usuario: venta.NombreUsuario,
                 estado: 'VENTA'
             },
@@ -331,7 +361,10 @@ const ObtenerVenta = async (CodigoPedido) => {
             Productos: productos,
 
             TotalAbonado: totalAbonado,
-            SaldoPendiente: saldoPendiente
+            SaldoPendiente: saldoPendiente,
+
+            FechaCreacion: venta.FechaCreacion || null,
+            FechaEntrega: venta.FechaEntrega || null
 
         };
 

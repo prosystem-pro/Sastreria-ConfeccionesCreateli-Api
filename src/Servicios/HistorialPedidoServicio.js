@@ -400,6 +400,55 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
                 }, { transaction: transaccion });
             }
         }
+        // ================= PAGO INICIAL (SI EXISTE) =================
+        if (datos.MontoPago && datos.FormaPago) {
+
+            const documentoPago = await GenerarDocumento(
+                'PAGO',
+                CodigoEmpresa,
+                transaccion,
+                pedido.CodigoPedido
+            );
+
+            if (!documentoPago)
+                LanzarError('No se pudo generar el documento de pago', 500);
+
+            const saldoAnterior = Number(pedido.Total);
+            const saldoPendiente = Number(pedido.Total) - Number(datos.MontoPago);
+
+            const pago = await PagoModelo.create({
+                CodigoEmpresa,
+                CodigoUsuario: usuario,
+                CodigoFormaPago: datos.FormaPago,
+
+                Serie: documentoPago.Serie,
+                TipoDocumento: documentoPago.TipoDocumento,
+                NumeroDocumento: documentoPago.NumeroDocumento,
+                Numero: documentoPago.Numero,
+
+                SaldoAnterior: saldoAnterior,
+                SaldoPendiente: saldoPendiente,
+
+                Monto: datos.MontoPago,
+                FechaPago: new Date(),
+
+                NumeroComprobante: datos.Referencia || null,
+                UrlImagen: datos.UrlImagen || null,
+                Observacion: datos.Observacion || null,
+
+                Estatus: 1
+
+            }, { transaction: transaccion });
+
+            await PagoAplicacionModelo.create({
+                CodigoPago: pago.CodigoPago,
+
+                TipoDocumento: 'PEDIDO',
+                CodigoDocumento: pedido.CodigoPedido,
+
+                MontoAplicado: datos.MontoPago
+            }, { transaction: transaccion });
+        }
 
         await transaccion.commit();
 
@@ -518,12 +567,8 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
 
 
         // ================= FECHAS =================
-        const fechaPedido = new Date().toLocaleDateString();
-
-        const fechaEntrega = pedido.FechaEntrega
-            ? new Date(pedido.FechaEntrega).toLocaleDateString()
-            : '';
-
+        const fechaPedido = pedido.FechaCreacion;
+        const fechaEntrega = pedido.FechaEntrega;
 
         // ================= PDF =================
         const doc = new PDFDocument({ margin: 40 });
@@ -665,8 +710,10 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
 
         totalesY += 15;
 
+        const descuentoValor = (pedido.Subtotal * pedido.Descuento) / 100;
+
         doc.text('Descuento:', xLabel, totalesY);
-        doc.text(`Q ${pedido.Descuento.toFixed(2)}`, xMonto, totalesY, { width: anchoMonto, align: 'right' });
+        doc.text(`Q ${descuentoValor.toFixed(2)}`, xMonto, totalesY, { width: anchoMonto, align: 'right' });
 
         totalesY += 15;
 
@@ -950,7 +997,8 @@ const ObtenerDatosImpresionPagoPedido = async (CodigoPago) => {
         const referencia = pagoAplicacion.FnPago.NumeroComprobante || null;
 
         const saldoAnterior = Number(pagoAplicacion.FnPago.SaldoAnterior || 0);
-        const saldoPendiente = Number(pagoAplicacion.FnPago.SaldoPendiente || 0);
+        // const saldoPendiente = Number(pagoAplicacion.FnPago.SaldoPendiente || 0);
+        const saldoPendiente = Number(pedido.Total) - Number(monto);
 
         const fechaPago = pagoAplicacion.FnPago.FechaPago
             ? new Date(pagoAplicacion.FnPago.FechaPago).toLocaleDateString()
@@ -1170,6 +1218,7 @@ const ObtenerPedido = async (CodigoPedido) => {
                 'CodigoUsuario',
                 'NumeroDocumento',
                 'FechaEntrega',
+                'FechaCreacion',
                 'CodigoEstadoPedido',
                 'Descuento',
                 'Subtotal',
@@ -1352,7 +1401,13 @@ const ObtenerPedido = async (CodigoPedido) => {
             NombreCliente: pedido.CaCliente?.NombreCliente || '',
             CodigoUsuario: pedido.CodigoUsuario,
             NombreUsuario: pedido.AdUsuario?.NombreUsuario || '',
-            FechaEntrega: pedido.FechaEntrega,
+            FechaCreacion: pedido.FechaCreacion
+                ? UTCAGuatemala_FechaHora(pedido.FechaCreacion)
+                : null,
+
+            FechaEntrega: pedido.FechaEntrega
+                ? FormatoFecha(pedido.FechaEntrega)
+                : '',
             CodigoEstadoPedido: pedido.CodigoEstadoPedido,
             NombreEstadoPedido: pedido.CaEstadoPedido?.NombreEstadoPedido || '',
             Descuento: pedido.Descuento || 0,
@@ -1861,7 +1916,6 @@ const ActualizarPedido = async (datos, usuario) => {
 };
 const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false) => {
     try {
-
         let where = {
             Estatus: { [Op.in]: [1, 2, 3, 4] }
         };
