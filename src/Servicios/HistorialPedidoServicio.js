@@ -248,13 +248,13 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
     try {
 
         if (!CodigoEmpresa)
-            LanzarError('La empresa es obligatoria', 400);
+            LanzarError('La empresa es obligatoria', 400, 'Alerta');
 
         if (!datos.CodigoCliente)
-            LanzarError('El cliente es obligatorio', 400, 'Advertencia');
+            LanzarError('El cliente es obligatorio', 400, 'Alerta');
 
         if (!datos.Productos || datos.Productos.length === 0)
-            LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
+            LanzarError('El pedido debe tener al menos un producto', 400, 'Alerta');
 
         let fechaEntrega = datos.FechaEntrega || null;
 
@@ -288,6 +288,19 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
 
         // ================= PRODUCTOS =================
         for (const producto of datos.Productos) {
+
+            // ================= VALIDAR CANTIDAD =================
+            if (producto.Cantidad === null || producto.Cantidad === undefined)
+                LanzarError('La cantidad es obligatoria', 400, 'Alerta');
+
+            if (typeof producto.Cantidad !== 'number' || isNaN(producto.Cantidad))
+                LanzarError('La cantidad debe ser un número válido', 400, 'Alerta');
+
+            if (!Number.isInteger(producto.Cantidad))
+                LanzarError('La cantidad debe ser un número entero', 400, 'Alerta');
+
+            if (producto.Cantidad <= 0)
+                LanzarError('La cantidad debe ser mayor a 0', 400, 'Alerta');
 
             const tipoProducto = producto.NombreTipoProducto?.toUpperCase();
             const esFisico = tipoProducto === 'FISICO';
@@ -2214,7 +2227,7 @@ const ListadoVariacionesProducto = async (CodigoProducto) => {
             include: [
                 {
                     model: TipoTelaModelo,
-                    as: 'TipoTela', 
+                    as: 'TipoTela',
                     attributes: ['NombreTipoTela']
                 },
                 {
