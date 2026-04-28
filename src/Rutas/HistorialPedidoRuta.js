@@ -46,5 +46,5 @@ Router.get(`/${Modelo}/pdf-pago/:CodigoPedido`, VerificarToken, VerificarPermiso
 Router.get(`/${Modelo}/imprimir/:CodigoPedido`, VerificarToken, VerificarPermisos('ImprimirVenta', Tabla), ObtenerDatosImpresion);
 
 Router.get(`/${Modelo}/imprimir-pago/:CodigoPago`, VerificarToken, VerificarPermisos('ImprimirPagoPedido', Tabla), ObtenerDatosImpresionPagoPedido);
-Router.get(`/${Modelo}/variaciones-producto`, VerificarToken, VerificarPermisos('ImprimirPagoPedido', Tabla), ListadoVariacionesProducto);
+Router.get(`/${Modelo}/variaciones-producto`, VerificarToken, VerificarPermisos('ListadoVariacionesProductos', Tabla), ListadoVariacionesProducto);
 module.exports = Router;
