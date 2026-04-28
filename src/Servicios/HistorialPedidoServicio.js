@@ -2193,6 +2193,72 @@ const ListadoProducto = async (CodigoTipoProducto = null) => {
         LanzarError('Error al obtener productos', 500, 'Error');
     }
 };
+const ListadoVariacionesProducto = async (CodigoProducto) => {
+    try {
+
+        if (!CodigoProducto) {
+            throw new Error('CodigoProducto es requerido');
+        }
+
+        const variaciones = await InventarioModelo.findAll({
+
+            where: {
+                CodigoProducto: CodigoProducto
+            },
+
+            attributes: [
+                'CodigoTipoTela',
+                'CodigoTela'
+            ],
+
+            include: [
+                {
+                    model: TipoTelaModelo,
+                    as: 'TipoTela', 
+                    attributes: ['NombreTipoTela']
+                },
+                {
+                    model: TelaModelo,
+                    as: 'Tela',
+                    attributes: ['NombreTela']
+                }
+            ],
+
+            raw: true
+        });
+
+        const tiposTelaMap = new Map();
+        const telas = [];
+
+        variaciones.forEach(v => {
+
+            // TIPOS TELA únicos
+            if (!tiposTelaMap.has(v.CodigoTipoTela)) {
+                tiposTelaMap.set(v.CodigoTipoTela, {
+                    CodigoTipoTela: v.CodigoTipoTela,
+                    NombreTipoTela: v['TipoTela.NombreTipoTela']
+                });
+            }
+
+            // TELAS
+            telas.push({
+                CodigoTela: v.CodigoTela,
+                NombreTela: v['Tela.NombreTela'],
+                CodigoTipoTela: v.CodigoTipoTela
+            });
+
+        });
+
+        return {
+            TiposTela: Array.from(tiposTelaMap.values()),
+            Telas: telas
+        };
+
+    } catch (error) {
+        console.error('[ListadoVariacionesProducto] Error:', error);
+        throw error;
+    }
+};
 const ListadoTipoTela = async () => {
 
     try {
@@ -2412,5 +2478,5 @@ module.exports = {
     ListadoTela, ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido, ListadoTipoCuello,
     ObtenerPedido, ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido,
     EliminarPedido, ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido,
-    ObtenerDatosImpresionPagoPedido
+    ObtenerDatosImpresionPagoPedido, ListadoVariacionesProducto
 };

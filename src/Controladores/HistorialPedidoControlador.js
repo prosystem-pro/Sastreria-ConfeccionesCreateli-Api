@@ -413,6 +413,33 @@ const ListadoProducto = async (req, res) => {
   }
 };
 
+const ListadoVariacionesProducto = async (req, res) => {
+  try {
+
+    const { CodigoProducto } = req.query;
+
+    if (!CodigoProducto) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'CodigoProducto es requerido'
+      });
+    }
+
+    const variaciones = await Servicio.ListadoVariacionesProducto(
+      Number(CodigoProducto)
+    );
+
+    return ResponderExito(
+      res,
+      'Variaciones obtenidas correctamente.',
+      variaciones
+    );
+
+  } catch (error) {
+    return ManejarError(error, res);
+  }
+};
+
 const ListadoTipoCuello = async (req, res) => {
   try {
 
@@ -518,5 +545,6 @@ module.exports = {
   Listado, Obtener, ListadoTipoProducto, ListadoTipoTela, ListadoTela,
   ListadoProducto, ObtenerProducto, ListadoCliente, CrearPedido, ListadoTipoCuello, ObtenerPedido,
   ActualizarPedido, ListadoFormaPago, RegistrarPagoPedido, ListarPagosPorPedido, EliminarPedido,
-  ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido, ObtenerDatosImpresionPagoPedido
+  ListadoEstadoPedido, ListadoEntregados, GenerarPDFPedido, GenerarPDFPagoPedido, ObtenerDatosImpresionPagoPedido,
+  ListadoVariacionesProducto
 };
