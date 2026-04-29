@@ -256,6 +256,23 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
         if (!datos.Productos || datos.Productos.length === 0)
             LanzarError('El pedido debe tener al menos un producto', 400, 'Alerta');
 
+        // ================= VALIDAR DESCUENTO =================
+        if (datos.Descuento === null || datos.Descuento === undefined)
+            LanzarError('El descuento es obligatorio', 400, 'Alerta');
+
+        if (typeof datos.Descuento !== 'number' || isNaN(datos.Descuento))
+            LanzarError('El descuento debe ser un número válido', 400, 'Alerta');
+
+        if (!Number.isInteger(datos.Descuento))
+            LanzarError('El descuento debe ser un número entero', 400, 'Alerta');
+
+        if (datos.Descuento < 0)
+            LanzarError('El descuento no puede ser negativo', 400, 'Alerta');
+
+        if (datos.Descuento > 100)
+            LanzarError('El descuento no puede ser mayor a 100', 400, 'Alerta');
+
+
         let fechaEntrega = datos.FechaEntrega || null;
 
         const documentoPedido = await GenerarDocumento('PEDIDO', CodigoEmpresa, transaccion);
@@ -491,6 +508,216 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
         throw error;
     }
 };
+const ActualizarPedido = async (datos, usuario) => {
+
+    const transaccion = await BaseDatos.transaction();
+
+    try {
+
+        if (!datos.CodigoPedido)
+            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+
+        if (!datos.CodigoCliente)
+            LanzarError('El cliente es obligatorio', 400, 'Advertencia');
+
+        if (!datos.Productos || datos.Productos.length === 0)
+            LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
+        // ================= VALIDAR DESCUENTO =================
+        if (datos.Descuento === null || datos.Descuento === undefined)
+            LanzarError('El descuento es obligatorio', 400, 'Advertencia');
+
+        if (typeof datos.Descuento !== 'number' || isNaN(datos.Descuento))
+            LanzarError('El descuento debe ser un número válido', 400, 'Advertencia');
+
+        if (!Number.isInteger(datos.Descuento))
+            LanzarError('El descuento debe ser un número entero', 400, 'Advertencia');
+
+        if (datos.Descuento < 0)
+            LanzarError('El descuento no puede ser negativo', 400, 'Advertencia');
+
+        if (datos.Descuento > 100)
+            LanzarError('El descuento no puede ser mayor a 100', 400, 'Advertencia');
+
+        // ===================== VALIDAR PEDIDO =====================
+        const pedido = await PedidoModelo.findOne({
+            where: {
+                CodigoPedido: datos.CodigoPedido,
+                Estatus: 1
+            },
+            transaction: transaccion
+        });
+
+        if (!pedido)
+            LanzarError('Pedido no encontrado', 404, 'Advertencia');
+
+        // ===================== OBTENER DETALLES ANTERIORES =====================
+        const detallesAnteriores = await PedidoDetalleModelo.findAll({
+            where: { CodigoPedido: datos.CodigoPedido },
+            transaction: transaccion
+        });
+
+        // ===================== DEVOLVER STOCK =====================
+        for (const det of detallesAnteriores) {
+
+            const inventario = await InventarioModelo.findOne({
+                where: { CodigoInventario: det.CodigoInventario },
+                transaction: transaccion
+            });
+
+            if (inventario) {
+
+                await inventario.update({
+                    StockActual: inventario.StockActual + det.Cantidad
+                }, { transaction: transaccion });
+            }
+
+            await PedidoDetalleMedidaModelo.destroy({
+                where: { CodigoPedidoDetalle: det.CodigoPedidoDetalle },
+                transaction: transaccion
+            });
+
+            await det.destroy({ transaction: transaccion });
+        }
+        const convertirFecha = (fecha) => {
+            if (!fecha) return null;
+
+            const [dia, mes, anio] = fecha.split('/');
+            return `${anio}-${mes}-${dia}`;
+        };
+        // ===================== ACTUALIZAR ENCABEZADO =====================
+        await pedido.update({
+
+            CodigoCliente: datos.CodigoCliente,
+            CodigoEstadoPedido: datos.CodigoEstadoPedido,
+            FechaEntrega: convertirFecha(datos.FechaEntrega),
+
+            Subtotal: datos.Subtotal,
+            Descuento: datos.Descuento,
+            Total: datos.Total
+
+        }, { transaction: transaccion });
+
+        // ===================== INSERTAR NUEVOS PRODUCTOS =====================
+        for (const producto of datos.Productos) {
+            // ================= VALIDAR CANTIDAD =================
+            if (producto.Cantidad === null || producto.Cantidad === undefined)
+                LanzarError('La cantidad es obligatoria', 400, 'Advertencia');
+
+            if (typeof producto.Cantidad !== 'number' || isNaN(producto.Cantidad))
+                LanzarError('La cantidad debe ser un número válido', 400, 'Advertencia');
+
+            if (!Number.isInteger(producto.Cantidad))
+                LanzarError('La cantidad debe ser un número entero', 400, 'Advertencia');
+
+            if (producto.Cantidad <= 0)
+                LanzarError('La cantidad debe ser mayor a 0', 400, 'Advertencia');
+            const tipoProducto = producto.NombreTipoProducto?.toUpperCase();
+            const esFisico = tipoProducto === 'FISICO';
+            const esConfeccion = tipoProducto === 'CONFECCION';
+
+            if (!esFisico && !esConfeccion)
+                LanzarError(`Tipo de producto no reconocido: ${tipoProducto}`, 400, 'Advertencia');
+
+            const inventario = await InventarioModelo.findOne({
+                where: {
+                    CodigoProducto: producto.CodigoProducto,
+                    Estatus: 1
+                },
+                transaction: transaccion
+            });
+
+            if (!inventario)
+                LanzarError(
+                    `No hay inventario para el producto ${producto.CodigoProducto}`,
+                    400,
+                    'Advertencia'
+                );
+
+            if (esFisico && inventario.StockActual < producto.Cantidad)
+                LanzarError(
+                    `Stock insuficiente para el producto ${producto.CodigoProducto}`,
+                    400,
+                    'Advertencia'
+                );
+
+            const detalle = await PedidoDetalleModelo.create({
+
+                CodigoPedido: pedido.CodigoPedido,
+                CodigoInventario: inventario.CodigoInventario,
+
+                CodigoTipoTela: producto.CodigoTipoTela || null,
+                CodigoTela: producto.CodigoTela || null,
+
+                Codigo: producto.Codigo || null,
+                Color: producto.Color || null,
+                Referencia: producto.Referencia || null,
+
+                Cantidad: producto.Cantidad,
+                PrecioVenta: producto.Precio,
+                Subtotal: producto.Subtotal,
+
+                Estatus: 1
+
+            }, { transaction: transaccion });
+
+            // ===================== MEDIDAS (MISMA LOGICA QUE CREAR) =====================
+            if (producto.Medidas) {
+
+                const medidas = producto.Medidas;
+
+                for (const key in medidas) {
+
+                    const valor = medidas[key];
+
+                    if (valor === null || valor === undefined || valor === '')
+                        continue;
+
+                    const tipoMedida = await TipoMedidaModelo.findOne({
+                        where: { NombreTipoMedida: key },
+                        transaction: transaccion
+                    });
+
+                    if (!tipoMedida) continue;
+
+                    const esNumero = typeof valor === 'number';
+
+                    await PedidoDetalleMedidaModelo.create({
+
+                        CodigoPedidoDetalle: detalle.CodigoPedidoDetalle,
+                        CodigoTipoMedida: tipoMedida.CodigoTipoMedida,
+
+                        Valor: esNumero ? valor : null,
+                        Descripcion: !esNumero ? String(valor) : null
+
+                    }, { transaction: transaccion });
+                }
+            }
+
+            // ===================== DESCONTAR STOCK =====================
+            if (esFisico) {
+                await inventario.update({
+                    StockActual: inventario.StockActual - producto.Cantidad
+                }, { transaction: transaccion });
+            }
+        }
+
+        await transaccion.commit();
+
+        return {
+            CodigoPedido: pedido.CodigoPedido,
+            ok: true
+        };
+
+    } catch (error) {
+
+        try {
+            await transaccion.rollback();
+        } catch (_) { }
+
+        throw error;
+    }
+};
+
 const GenerarPDFPedido = async (CodigoPedido, res) => {
     try {
 
@@ -1770,175 +1997,7 @@ const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOt
         LanzarError('Error al obtener pedidos entregados', 500);
     }
 };
-const ActualizarPedido = async (datos, usuario) => {
 
-    const transaccion = await BaseDatos.transaction();
-
-    try {
-
-        if (!datos.CodigoPedido)
-            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
-
-        if (!datos.CodigoCliente)
-            LanzarError('El cliente es obligatorio', 400, 'Advertencia');
-
-        if (!datos.Productos || datos.Productos.length === 0)
-            LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
-
-        // ===================== VALIDAR PEDIDO =====================
-        const pedido = await PedidoModelo.findOne({
-            where: {
-                CodigoPedido: datos.CodigoPedido,
-                Estatus: 1
-            },
-            transaction: transaccion
-        });
-
-        if (!pedido)
-            LanzarError('Pedido no encontrado', 404, 'Advertencia');
-
-        // ===================== OBTENER DETALLES ANTERIORES =====================
-        const detallesAnteriores = await PedidoDetalleModelo.findAll({
-            where: { CodigoPedido: datos.CodigoPedido },
-            transaction: transaccion
-        });
-
-        // ===================== DEVOLVER STOCK =====================
-        for (const det of detallesAnteriores) {
-
-            const inventario = await InventarioModelo.findOne({
-                where: { CodigoInventario: det.CodigoInventario },
-                transaction: transaccion
-            });
-
-            if (inventario) {
-
-                await inventario.update({
-                    StockActual: inventario.StockActual + det.Cantidad
-                }, { transaction: transaccion });
-            }
-
-            await PedidoDetalleMedidaModelo.destroy({
-                where: { CodigoPedidoDetalle: det.CodigoPedidoDetalle },
-                transaction: transaccion
-            });
-
-            await det.destroy({ transaction: transaccion });
-        }
-
-        // ===================== ACTUALIZAR ENCABEZADO =====================
-        await pedido.update({
-
-            CodigoCliente: datos.CodigoCliente,
-            CodigoEstadoPedido: datos.CodigoEstadoPedido,
-            FechaEntrega: datos.FechaEntrega,
-
-            Subtotal: datos.Subtotal,
-            Descuento: datos.Descuento,
-            Total: datos.Total
-
-        }, { transaction: transaccion });
-
-        // ===================== INSERTAR NUEVOS PRODUCTOS =====================
-        for (const producto of datos.Productos) {
-
-            const inventario = await InventarioModelo.findOne({
-                where: {
-                    CodigoProducto: producto.CodigoProducto,
-                    Estatus: 1
-                },
-                transaction: transaccion
-            });
-
-            if (!inventario)
-                LanzarError(
-                    `No hay inventario para el producto ${producto.CodigoProducto}`,
-                    400,
-                    'Advertencia'
-                );
-
-            if (inventario.StockActual < producto.Cantidad)
-                LanzarError(
-                    `Stock insuficiente para el producto ${producto.CodigoProducto}`,
-                    400,
-                    'Advertencia'
-                );
-
-            const detalle = await PedidoDetalleModelo.create({
-
-                CodigoPedido: pedido.CodigoPedido,
-                CodigoInventario: inventario.CodigoInventario,
-
-                CodigoTipoTela: producto.CodigoTipoTela || null,
-                CodigoTela: producto.CodigoTela || null,
-
-                Codigo: producto.Codigo || null,
-                Color: producto.Color || null,
-                Referencia: producto.Referencia || null,
-
-                Cantidad: producto.Cantidad,
-                PrecioVenta: producto.Precio,
-                Subtotal: producto.Subtotal,
-
-                Estatus: 1
-
-            }, { transaction: transaccion });
-
-            // ===================== MEDIDAS (MISMA LOGICA QUE CREAR) =====================
-            if (producto.Medidas) {
-
-                const medidas = producto.Medidas;
-
-                for (const key in medidas) {
-
-                    const valor = medidas[key];
-
-                    if (valor === null || valor === undefined || valor === '')
-                        continue;
-
-                    const tipoMedida = await TipoMedidaModelo.findOne({
-                        where: { NombreTipoMedida: key },
-                        transaction: transaccion
-                    });
-
-                    if (!tipoMedida) continue;
-
-                    const esNumero = typeof valor === 'number';
-
-                    await PedidoDetalleMedidaModelo.create({
-
-                        CodigoPedidoDetalle: detalle.CodigoPedidoDetalle,
-                        CodigoTipoMedida: tipoMedida.CodigoTipoMedida,
-
-                        Valor: esNumero ? valor : null,
-                        Descripcion: !esNumero ? String(valor) : null
-
-                    }, { transaction: transaccion });
-                }
-            }
-
-            // ===================== DESCONTAR STOCK =====================
-            await inventario.update({
-                StockActual: inventario.StockActual - producto.Cantidad
-            }, { transaction: transaccion });
-        }
-
-        await transaccion.commit();
-
-        return {
-            CodigoPedido: pedido.CodigoPedido,
-            ok: true
-        };
-
-    } catch (error) {
-
-        try {
-            await transaccion.rollback();
-        } catch (_) { }
-
-        throw error;
-    }
-};
 const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false) => {
     try {
         let where = {
