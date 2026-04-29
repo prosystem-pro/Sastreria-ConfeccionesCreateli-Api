@@ -484,17 +484,45 @@ const ListadoEstadoPedido = async (req, res) => {
   }
 };
 
+// const ObtenerProducto = async (req, res) => {
+//   try {
+//     const { codigo } = req.params;
+
+//     // Llamamos al servicio que devuelve solo nombre y precio
+//     const producto = await Servicio.ObtenerProducto(codigo);
+
+//     return ResponderExito(
+//       res,
+//       'Producto obtenido correctamente.',
+//       producto || {}
+//     );
+
+//   } catch (error) {
+//     return ManejarError(
+//       error,
+//       res,
+//       'Error al obtener el producto'
+//     );
+//   }
+// };
 const ObtenerProducto = async (req, res) => {
   try {
+
     const { codigo } = req.params;
 
-    // Llamamos al servicio que devuelve solo nombre y precio
-    const producto = await Servicio.ObtenerProducto(codigo);
+    // 🔥 variaciones opcionales (solo para confección)
+    const { codigoTela, codigoTipoTela } = req.query;
+
+    const producto = await Servicio.ObtenerProducto(
+      codigo,
+      codigoTela || null,
+      codigoTipoTela || null
+    );
 
     return ResponderExito(
       res,
       'Producto obtenido correctamente.',
-      producto || {}
+      producto
     );
 
   } catch (error) {

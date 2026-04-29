@@ -2402,27 +2402,102 @@ const ListadoEstadoPedido = async () => {
     }
 
 };
-const ObtenerProducto = async (codigoProducto) => {
+// const ObtenerProducto = async (codigoProducto) => {
+//     try {
+//         const producto = await Producto.findOne({
+//             where: { CodigoProducto: codigoProducto },
+//             attributes: ['NombreProducto', 'PrecioBase']  // Solo los campos que necesitas
+//         });
+
+//         if (!producto) {
+//             LanzarError('Producto no encontrado', 404, 'Advertencia');
+//         }
+
+//         return {
+//             NombreProducto: producto.NombreProducto,
+//             Precio: producto.PrecioBase
+//         };
+
+//     } catch (error) {
+//         console.error(error);
+//         LanzarError('Error al obtener producto', 500, 'Error');
+//     }
+// };
+
+const ObtenerProducto = async (codigoProducto, codigoTela = null, codigoTipoTela = null) => {
     try {
-        const producto = await Producto.findOne({
+
+        if (!codigoProducto)
+            LanzarError('El código del producto es obligatorio', 400, 'Advertencia');
+
+        const producto = await ProductoModelo.findOne({
             where: { CodigoProducto: codigoProducto },
-            attributes: ['NombreProducto', 'PrecioBase']  // Solo los campos que necesitas
+            attributes: ['CodigoProducto', 'NombreProducto'],
+            include: [
+                {
+                    model: TipoProductoModelo,
+                    as: 'TipoProducto',
+                    attributes: ['NombreTipoProducto']
+                }
+            ]
         });
 
-        if (!producto) {
+        if (!producto)
             LanzarError('Producto no encontrado', 404, 'Advertencia');
+
+        const tipoProducto = (producto.TipoProducto?.NombreTipoProducto || '').toUpperCase();
+
+        if (!tipoProducto)
+            LanzarError('El tipo de producto no está configurado correctamente', 400, 'Advertencia');
+
+        let inventario = null;
+
+        // ===================== FISICO =====================
+        if (tipoProducto === 'FISICO') {
+
+            inventario = await InventarioModelo.findOne({
+                where: {
+                    CodigoProducto: codigoProducto,
+                    CodigoTipoTela: null,
+                    CodigoTela: null
+                },
+                attributes: ['PrecioVenta']
+            });
+
         }
+        // ===================== CONFECCION =====================
+        else if (tipoProducto === 'CONFECCION') {
+
+            if (!codigoTela || !codigoTipoTela)
+                LanzarError('La variación de tela es obligatoria para productos de confección', 400, 'Advertencia');
+
+            inventario = await InventarioModelo.findOne({
+                where: {
+                    CodigoProducto: codigoProducto,
+                    CodigoTipoTela: codigoTipoTela,
+                    CodigoTela: codigoTela
+                },
+                attributes: ['PrecioVenta']
+            });
+
+        }
+        else {
+            LanzarError(`Tipo de producto no válido: ${tipoProducto}`, 400, 'Advertencia');
+        }
+
+        if (!inventario)
+            LanzarError('No se encontró la variación del producto con precio', 404, 'Advertencia');
 
         return {
             NombreProducto: producto.NombreProducto,
-            Precio: producto.PrecioBase
+            Precio: inventario.PrecioVenta
         };
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al obtener producto', 500, 'Error');
+        throw error;
     }
 };
+
 const ListadoCliente = async (CodigoEmpresa, SuperAdmin) => {
 
     try {
