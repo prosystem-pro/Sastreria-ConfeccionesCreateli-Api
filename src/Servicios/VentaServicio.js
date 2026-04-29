@@ -101,7 +101,9 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
             const nombreFormaPago =
                 mapaFormaPago[p.FnPago?.CodigoFormaPago] || 'Sin forma';
 
-            if (nombreFormaPago.toLowerCase().includes('tarjeta')) {
+            const nombre = nombreFormaPago.toLowerCase();
+
+            if (nombre.includes('tarjeta') || nombre.includes('transfer')) {
 
                 tarjetaPago = {
                     nombre: nombreFormaPago,
