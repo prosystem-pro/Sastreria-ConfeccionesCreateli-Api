@@ -29,7 +29,7 @@ const TipoProductoModelo = require(Path.join(RutaModelos, 'TipoProducto.js'))(Ba
 const TipoTelaModelo = require(Path.join(RutaModelos, 'TipoTela.js'))(BaseDatos, Sequelize.DataTypes);
 const TelaModelo = require(Path.join(RutaModelos, 'Tela.js'))(BaseDatos, Sequelize.DataTypes);
 const MovimientoInventarioModelo = require(Path.join(RutaModelos, 'MovimientoInventario.js'))(BaseDatos, Sequelize.DataTypes);
-
+const FormaPagoModelo = require(Path.join(RutaModelos, 'FormaPago.js'))(BaseDatos, Sequelize.DataTypes);
 // ===================== RELACIONES =====================
 // Usuario - Empresa
 UsuarioModelo.belongsTo(EmpresaModelo, { foreignKey: 'CodigoEmpresa', as: 'Empresa' }); EmpresaModelo.hasMany(UsuarioModelo, { foreignKey: 'CodigoEmpresa', as: 'Usuarios' });

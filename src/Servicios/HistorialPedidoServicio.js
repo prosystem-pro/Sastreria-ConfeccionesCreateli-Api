@@ -505,7 +505,6 @@ const ActualizarPedido = async (datos, usuario) => {
         throw error;
     }
 };
-
 const GenerarPDFPedido = async (CodigoPedido, res) => {
     try {
 
@@ -1113,16 +1112,52 @@ const RegistrarPagoPedido = async (datos, usuario) => {
 
         // ================= VALIDACIONES =================
         if (!datos.CodigoPedido)
-            LanzarError('El pedido es obligatorio', 400, 'Advertencia');
+            LanzarError('El pedido es obligatorio', 400, 'Alerta');
 
         if (!datos.MontoPago)
-            LanzarError('El monto del pago es obligatorio', 400, 'Advertencia');
+            LanzarError('El monto del pago es obligatorio', 400, 'Alerta');
+
+        if (isNaN(datos.MontoPago))
+            LanzarError('El monto debe ser numérico', 400, 'Alerta');
+
+        if (Number(datos.MontoPago) <= 0)
+            LanzarError('El monto debe ser mayor a cero', 400, 'Alerta');
+
+        if (!Number.isInteger(Number(datos.MontoPago)))
+            LanzarError('El monto debe ser un número entero', 400, 'Alerta');
 
         if (!datos.FormaPago)
-            LanzarError('La forma de pago es obligatoria', 400, 'Advertencia');
+            LanzarError('La forma de pago es obligatoria', 400, 'Alerta');
 
         if (datos.MontoPago <= 0)
-            LanzarError('El monto debe ser mayor a cero', 400, 'Advertencia');
+            LanzarError('El monto debe ser mayor a cero', 400, 'Alerta');
+
+
+        const formaPago = await FormaPago.findOne({
+            where: { CodigoFormaPago: datos.FormaPago },
+            attributes: ['NombreFormaPago'],
+            transaction: transaccion
+        });
+
+        if (!formaPago)
+            LanzarError('La forma de pago no existe', 404, 'Advertencia');
+
+        // ================= REGLA DE NEGOCIO =================
+        const requiereReferencia =
+            ['TARJETA', 'TRANSFERENCIA'].includes(
+                formaPago.NombreFormaPago?.toUpperCase()
+            );
+
+        if (requiereReferencia && !datos.Referencia?.trim()) {
+            LanzarError(
+                'La referencia es obligatoria para pagos con tarjeta o transferencia',
+                400,
+                'Alerta'
+            );
+        }
+
+        // ================= NORMALIZAR =================
+        const referencia = datos.Referencia?.trim() ?? null;
 
         const CodigoEmpresa = 1;
 
@@ -1170,9 +1205,6 @@ const RegistrarPagoPedido = async (datos, usuario) => {
 
         if (!documento)
             LanzarError('No se pudo generar el documento de pago', 500, 'Error');
-
-        // ================= NORMALIZAR REFERENCIA =================
-        const referencia = datos.Referencia ?? null;
 
         // ================= CREAR PAGO =================
         const pago = await PagoModelo.create({
@@ -2278,28 +2310,6 @@ const ListadoEstadoPedido = async () => {
     }
 
 };
-// const ObtenerProducto = async (codigoProducto) => {
-//     try {
-//         const producto = await Producto.findOne({
-//             where: { CodigoProducto: codigoProducto },
-//             attributes: ['NombreProducto', 'PrecioBase']  // Solo los campos que necesitas
-//         });
-
-//         if (!producto) {
-//             LanzarError('Producto no encontrado', 404, 'Advertencia');
-//         }
-
-//         return {
-//             NombreProducto: producto.NombreProducto,
-//             Precio: producto.PrecioBase
-//         };
-
-//     } catch (error) {
-//         console.error(error);
-//         LanzarError('Error al obtener producto', 500, 'Error');
-//     }
-// };
-
 const ObtenerProducto = async (codigoProducto, codigoTela = null, codigoTipoTela = null) => {
     try {
 
@@ -2373,7 +2383,6 @@ const ObtenerProducto = async (codigoProducto, codigoTela = null, codigoTipoTela
         throw error;
     }
 };
-
 const ListadoCliente = async (CodigoEmpresa, SuperAdmin) => {
 
     try {
