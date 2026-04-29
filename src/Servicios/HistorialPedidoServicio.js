@@ -884,8 +884,10 @@ const GenerarPDFPagoPedido = async (CodigoPago, res) => {
         const abono = Number(pagoAplicacion.MontoAplicado);
         const saldoAnterior = Number(pagoAplicacion.FnPago.SaldoAnterior || 0);
         const saldoPendiente = Number(pagoAplicacion.FnPago.SaldoPendiente || 0);
-        const fechaPago = pagoAplicacion.FnPago.FechaPago ? new Date(pagoAplicacion.FnPago.FechaPago).toLocaleDateString() : new Date().toLocaleDateString();
-        const fechaEntrega = pedido.FechaEntrega ? new Date(pedido.FechaEntrega).toLocaleDateString() : '';
+        const fechaPago = pagoAplicacion.FnPago.FechaCreacion
+            ? UTCAGuatemala_FechaHora(pagoAplicacion.FnPago.FechaCreacion)
+            : UTCAGuatemala_FechaHora(new Date());
+        const fechaEntrega = pedido.FechaEntrega || null;
 
         // ================= PDF =================
         const doc = new PDFDocument({ margin: 40 });
@@ -1042,15 +1044,13 @@ const ObtenerDatosImpresionPagoPedido = async (CodigoPago) => {
 
         const saldoAnterior = Number(pagoAplicacion.FnPago.SaldoAnterior || 0);
         // const saldoPendiente = Number(pagoAplicacion.FnPago.SaldoPendiente || 0);
-        const saldoPendiente = Number(pedido.Total) - Number(monto);
+        const saldoPendiente = pagoAplicacion.FnPago.SaldoPendiente
 
-        const fechaPago = pagoAplicacion.FnPago.FechaPago
-            ? new Date(pagoAplicacion.FnPago.FechaPago).toLocaleDateString()
-            : new Date().toLocaleDateString();
+        const fechaPago = pagoAplicacion.FnPago.FechaCreacion
+            ? UTCAGuatemala_FechaHora(pagoAplicacion.FnPago.FechaCreacion)
+            : UTCAGuatemala_FechaHora(new Date());
+        const fechaEntrega = pedido.FechaEntrega || null;
 
-        const fechaEntrega = pedido.FechaEntrega
-            ? new Date(pedido.FechaEntrega).toLocaleDateString()
-            : '';
 
         // ================= RETORNO =================
         return {
@@ -1077,6 +1077,7 @@ const ObtenerDatosImpresionPagoPedido = async (CodigoPago) => {
             },
 
             pago: {
+                documento: pagoAplicacion.FnPago.NumeroDocumento,
                 nombre: nombreFormaPago,
                 monto,
                 referencia
@@ -1223,6 +1224,7 @@ const RegistrarPagoPedido = async (datos, usuario) => {
 
             Monto: datos.MontoPago,
             FechaPago: new Date(),
+            FechaCreacion: new Date(),
 
             // 🔥 AQUÍ SE GUARDA LA REFERENCIA (TARJETA / EFECTIVO / ETC)
             NumeroComprobante: referencia,
