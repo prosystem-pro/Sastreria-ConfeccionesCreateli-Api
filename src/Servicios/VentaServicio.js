@@ -44,7 +44,6 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
 
         // ================= VENTA / PEDIDO =================
         const venta = await ObtenerVenta(Number(CodigoPedido));
-        console.log('VENTA', venta)
 
         if (!venta)
             LanzarError('Venta no encontrada', 404);
@@ -130,21 +129,21 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
 
 
 
-        console.log('📦 RETURN COMPLETO:', JSON.stringify({
-            empresa,
-            cliente,
-            venta,
-            productos: venta.Productos,
-            pago: tarjetaPago || otroPago,
-            referencia: tarjetaPago?.numeroComprobante || null,
-            totales: {
-                subtotal: Number(venta.Subtotal || 0),
-                descuento: Number(venta.Descuento || 0),
-                abono: Abono,
-                saldoPendiente: SaldoPendiente,
-                total: Total
-            }
-        }, null, 2));
+        // console.log('📦 RETURN COMPLETO:', JSON.stringify({
+        //     empresa,
+        //     cliente,
+        //     venta,
+        //     productos: venta.Productos,
+        //     pago: tarjetaPago || otroPago,
+        //     referencia: tarjetaPago?.numeroComprobante || null,
+        //     totales: {
+        //         subtotal: Number(venta.Subtotal || 0),
+        //         descuento: Number(venta.Descuento || 0),
+        //         abono: Abono,
+        //         saldoPendiente: SaldoPendiente,
+        //         total: Total
+        //     }
+        // }, null, 2));
         // ================= RETORNO FINAL =================
         return {
 

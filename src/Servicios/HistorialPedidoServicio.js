@@ -414,6 +414,18 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
             }
         }
         // ================= PAGO INICIAL (SI EXISTE) =================
+        // ================= VALIDACIONES DE PAGO =================
+        if (!datos.FormaPago)
+            LanzarError('La forma de pago es obligatoria', 400, 'Alerta');
+
+        if (datos.MontoPago === null || datos.MontoPago === undefined)
+            LanzarError('El monto de pago es obligatorio', 400, 'Alerta');
+
+        if (typeof datos.MontoPago !== 'number' || isNaN(datos.MontoPago))
+            LanzarError('El monto de pago debe ser un número válido', 400, 'Alerta');
+
+        if (datos.MontoPago <= 0)
+            LanzarError('El monto de pago debe ser mayor a 0', 400, 'Alerta');
         if (datos.MontoPago && datos.FormaPago) {
 
             const documentoPago = await GenerarDocumento(
