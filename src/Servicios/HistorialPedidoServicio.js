@@ -240,7 +240,7 @@ const TipoMedida = require('../Modelos/TipoMedida')(BaseDatos, Sequelize.DataTyp
 const FormaPago = require('../Modelos/FormaPago')(BaseDatos, Sequelize.DataTypes);
 const { GenerarDocumento } = require('../Utilidades/GeneradorDocumento');
 const { LanzarError } = require('../Utilidades/ErrorServicios');
-const { Op } = require('sequelize');
+const { Op, literal } = require('sequelize');
 
 const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
     const transaccion = await BaseDatos.transaction();
@@ -2377,7 +2377,10 @@ const ListadoEstadoPedido = async () => {
         const estadosPedido = await EstadoPedido.findAll({
 
             where: {
-                Estatus: 1
+                Estatus: 1,
+                NombreEstadoPedido: {
+                    [Op.ne]: 'VENDIDO'
+                }
             },
 
             attributes: [
@@ -2385,7 +2388,16 @@ const ListadoEstadoPedido = async () => {
                 'NombreEstadoPedido'
             ],
 
-            order: [['NombreEstadoPedido', 'ASC']]
+            order: [
+                [
+                    literal(`CASE 
+                        WHEN NombreEstadoPedido = 'ENTREGADO' THEN 1 
+                        ELSE 0 
+                    END`),
+                    'ASC'
+                ],
+                ['NombreEstadoPedido', 'ASC']
+            ]
 
         });
 
