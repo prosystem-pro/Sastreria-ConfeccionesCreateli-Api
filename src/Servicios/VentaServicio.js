@@ -126,26 +126,6 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
         const Total = Number(venta.Total || 0);
         const SaldoPendiente = Total - Abono;
 
-        // const fechaVenta = new Date().toLocaleDateString();
-
-
-
-
-        // console.log('📦 RETURN COMPLETO:', JSON.stringify({
-        //     empresa,
-        //     cliente,
-        //     venta,
-        //     productos: venta.Productos,
-        //     pago: tarjetaPago || otroPago,
-        //     referencia: tarjetaPago?.numeroComprobante || null,
-        //     totales: {
-        //         subtotal: Number(venta.Subtotal || 0),
-        //         descuento: Number(venta.Descuento || 0),
-        //         abono: Abono,
-        //         saldoPendiente: SaldoPendiente,
-        //         total: Total
-        //     }
-        // }, null, 2));
         // ================= RETORNO FINAL =================
         return {
 
@@ -380,7 +360,6 @@ const ObtenerVenta = async (CodigoPedido) => {
         );
     }
 };
-
 
 // CREAR VENTA (USANDO PEDIDO)
 const CrearVenta = async (datos, usuario) => {

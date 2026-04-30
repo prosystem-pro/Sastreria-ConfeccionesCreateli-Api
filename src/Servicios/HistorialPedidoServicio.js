@@ -1104,7 +1104,6 @@ const ObtenerDatosImpresionPagoPedido = async (CodigoPago) => {
         );
     }
 };
-
 const RegistrarPagoPedido = async (datos, usuario) => {
 
     const transaccion = await BaseDatos.transaction();
@@ -1802,8 +1801,8 @@ const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOt
                 CodigoEmpresa: p.CodigoEmpresa,
                 NombreEmpresa: NombreEmpresa,
                 NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
-                FechaCreacion: p.FechaCreacion,
-                FechaEntrega: p.FechaEntrega,
+                FechaCreacion: UTCAGuatemala_FechaHora(p.FechaCreacion),
+                FechaEntrega: FormatoFecha(p.FechaEntrega),
                 Subtotal: p.Subtotal,
                 Descuento: p.Descuento,
                 Total: Total,
