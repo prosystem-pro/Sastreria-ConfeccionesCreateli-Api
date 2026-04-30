@@ -1277,6 +1277,9 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         throw error;
     }
 };
+
+
+
 const ObtenerPedido = async (CodigoPedido) => {
     try {
 
