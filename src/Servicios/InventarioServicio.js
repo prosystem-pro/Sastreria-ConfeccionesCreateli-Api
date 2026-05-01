@@ -134,11 +134,8 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
         if (!CodigoColor)
             LanzarError('Color es requerido', 400);
 
-        if (Precio === undefined || Precio === null)
-            LanzarError('Precio es requerido', 400);
-
-        if (Stock === undefined || Stock === null)
-            LanzarError('Stock es requerido', 400);
+        Precio = NormalizarPrecio(Precio);
+        Stock = NormalizarStock(Stock);
 
         if (!CodigoEmpresa)
             LanzarError('Empresa es requerida', 400);
@@ -280,7 +277,49 @@ const NormalizarTexto = (texto) => {
         .toLowerCase()
         .replace(/\b\w/g, l => l.toUpperCase()); // Primera mayúscula por palabra
 };
+const NormalizarPrecio = (precio) => {
 
+    if (precio === undefined || precio === null)
+        LanzarError('Precio es requerido', 400);
+
+    // Convertir a número
+    const numero = Number(precio);
+
+    // Validar que sea número válido
+    if (isNaN(numero))
+        LanzarError('Precio debe ser numérico', 400);
+
+    // Validar positivo
+    if (numero < 0)
+        LanzarError('Precio no puede ser negativo', 400);
+
+    // Validar máximo 2 decimales
+    if (!/^\d+(\.\d{1,2})?$/.test(precio.toString()))
+        LanzarError('Precio debe tener máximo 2 decimales', 400);
+
+    return Number(numero.toFixed(2));
+};
+const NormalizarStock = (stock) => {
+
+    if (stock === undefined || stock === null)
+        LanzarError('Stock es requerido', 400);
+
+    const numero = Number(stock);
+
+    // No es número
+    if (isNaN(numero))
+        LanzarError('Stock debe ser un número', 400);
+
+    // No es entero
+    if (!Number.isInteger(numero))
+        LanzarError('Stock no permite decimales', 400);
+
+    // Negativo
+    if (numero < 0)
+        LanzarError('Stock debe ser un número positivo', 400);
+
+    return numero;
+};
 const ObtenerInventarioPorCodigo = async (CodigoInventario) => {
     try {
         if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
@@ -570,7 +609,7 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
 
     try {
 
-        const {
+        let {
             Producto,
             CodigoTipoProducto,
             CodigoMarca,
@@ -588,6 +627,7 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
         // =========================
         // VALIDACIONES
         // =========================
+        Producto = NormalizarTexto(Producto);
 
         if (!CodigoInventario)
             LanzarError('Código de inventario es requerido', 400);
@@ -610,11 +650,9 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
         if (!CodigoColor)
             LanzarError('Color es requerido', 400);
 
-        if (Precio === undefined || Precio === null)
-            LanzarError('Precio es requerido', 400);
+        Precio = NormalizarPrecio(Precio);
 
-        if (Stock === undefined || Stock === null)
-            LanzarError('Stock es requerido', 400);
+        Stock = NormalizarStock(Stock);
 
         if (!CodigoEmpresa)
             LanzarError('Empresa es requerida', 400);
