@@ -97,7 +97,7 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
 
     try {
 
-        const {
+        let {
             Producto,
             CodigoTipoProducto,
             CodigoMarca,
@@ -114,6 +114,7 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
         // =========================
         // VALIDACIONES
         // =========================
+        Producto = NormalizarTexto(Producto);
 
         if (!Producto)
             LanzarError('Producto es requerido', 400);
@@ -268,6 +269,16 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
         throw error;
 
     }
+};
+const NormalizarTexto = (texto) => {
+    return texto
+        .trim() // quita espacios extremos
+        .normalize("NFD") // separa tildes
+        .replace(/[\u0300-\u036f]/g, "") // elimina tildes
+        .replace(/[^a-zA-Z\s]/g, "") // solo letras y espacios
+        .replace(/\s+/g, " ") // quita espacios dobles
+        .toLowerCase()
+        .replace(/\b\w/g, l => l.toUpperCase()); // Primera mayúscula por palabra
 };
 
 const ObtenerInventarioPorCodigo = async (CodigoInventario) => {
