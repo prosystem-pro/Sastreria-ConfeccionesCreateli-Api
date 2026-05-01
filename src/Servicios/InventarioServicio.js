@@ -199,10 +199,17 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
         });
 
         if (ExisteInventario) {
-            LanzarError(
-                'Este producto ya existe en inventario con la misma combinación',
-                400
-            );
+
+            if ([1, 2].includes(ExisteInventario.Estatus)) {
+                LanzarError('Este producto ya existe', 400);
+            }
+
+            if (ExisteInventario.Estatus === 3) {
+                LanzarError(
+                    'El producto ya existe en registros eliminados. Debe restaurarlo desde Productos Eliminados.',
+                    400
+                );
+            }
         }
 
         // =========================
@@ -253,6 +260,11 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
     } catch (error) {
 
         await Transaccion.rollback();
+
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            LanzarError('Este producto ya existe', 400);
+        }
+
         throw error;
 
     }
@@ -894,6 +906,17 @@ const CrearMarca = async (NombreMarca) => {
 
     try {
 
+        const existe = await MarcaModelo.findOne({
+            where: {
+                NombreMarca,
+                Estatus: 1
+            }
+        });
+
+        if (existe) {
+            return LanzarError('La marca ya existe', 400, 'Alerta');
+        }
+
         const nuevaMarca = await MarcaModelo.create({
             NombreMarca,
             Estatus: 1
@@ -907,8 +930,12 @@ const CrearMarca = async (NombreMarca) => {
     } catch (error) {
 
         console.error(error);
-        LanzarError('Error al crear marca', 500, 'Error');
 
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return LanzarError('La marca ya existe', 400, 'Alerta');
+        }
+
+        throw error;
     }
 
 };
@@ -930,12 +957,15 @@ const CrearEstilo = async (NombreEstilo) => {
     } catch (error) {
 
         console.error(error);
-        LanzarError('Error al crear estilo', 500, 'Error');
 
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return LanzarError('El estilo ya existe', 400, 'Alerta');
+        }
+
+        throw error;
     }
 
 };
-
 const CrearTalla = async (NombreTalla) => {
 
     try {
@@ -953,8 +983,12 @@ const CrearTalla = async (NombreTalla) => {
     } catch (error) {
 
         console.error(error);
-        LanzarError('Error al crear talla', 500, 'Error');
 
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return LanzarError('La talla ya existe', 400, 'Alerta');
+        }
+
+        throw error;
     }
 
 };
@@ -976,8 +1010,12 @@ const CrearColor = async (NombreColor) => {
     } catch (error) {
 
         console.error(error);
-        LanzarError('Error al crear color', 500, 'Error');
 
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return LanzarError('El color ya existe', 400, 'Alerta');
+        }
+
+        throw error;
     }
 
 };
@@ -1086,7 +1124,7 @@ const ActualizarMarca = async (CodigoMarca, NombreMarca) => {
         const marca = await MarcaModelo.findByPk(CodigoMarca);
 
         if (!marca) {
-            LanzarError('Marca no encontrada', 404, 'Error');
+            return LanzarError('Marca no encontrada', 404, 'Error');
         }
 
         marca.NombreMarca = NombreMarca;
@@ -1101,12 +1139,15 @@ const ActualizarMarca = async (CodigoMarca, NombreMarca) => {
     } catch (error) {
 
         console.error(error);
-        LanzarError('Error al actualizar marca', 500, 'Error');
 
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return LanzarError('La marca ya existe', 400, 'Alerta');
+        }
+
+        throw error;
     }
 
 };
-
 const ActualizarEstilo = async (CodigoEstilo, NombreEstilo) => {
 
     try {
@@ -1114,7 +1155,7 @@ const ActualizarEstilo = async (CodigoEstilo, NombreEstilo) => {
         const estilo = await EstiloModelo.findByPk(CodigoEstilo);
 
         if (!estilo) {
-            LanzarError('Estilo no encontrado', 404, 'Error');
+            return LanzarError('Estilo no encontrado', 404, 'Error');
         }
 
         estilo.NombreEstilo = NombreEstilo;
@@ -1129,8 +1170,12 @@ const ActualizarEstilo = async (CodigoEstilo, NombreEstilo) => {
     } catch (error) {
 
         console.error(error);
-        LanzarError('Error al actualizar estilo', 500, 'Error');
 
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return LanzarError('El estilo ya existe', 400, 'Alerta');
+        }
+
+        throw error;
     }
 
 };
@@ -1142,7 +1187,7 @@ const ActualizarTalla = async (CodigoTalla, NombreTalla) => {
         const talla = await TallaModelo.findByPk(CodigoTalla);
 
         if (!talla) {
-            LanzarError('Talla no encontrada', 404, 'Error');
+            return LanzarError('Talla no encontrada', 404, 'Error');
         }
 
         talla.NombreTalla = NombreTalla;
@@ -1157,8 +1202,12 @@ const ActualizarTalla = async (CodigoTalla, NombreTalla) => {
     } catch (error) {
 
         console.error(error);
-        LanzarError('Error al actualizar talla', 500, 'Error');
 
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return LanzarError('La talla ya existe', 400, 'Alerta');
+        }
+
+        throw error;
     }
 
 };
@@ -1170,7 +1219,7 @@ const ActualizarColor = async (CodigoColor, NombreColor) => {
         const color = await ColorModelo.findByPk(CodigoColor);
 
         if (!color) {
-            LanzarError('Color no encontrado', 404, 'Error');
+            return LanzarError('Color no encontrado', 404, 'Error');
         }
 
         color.NombreColor = NombreColor;
@@ -1185,8 +1234,12 @@ const ActualizarColor = async (CodigoColor, NombreColor) => {
     } catch (error) {
 
         console.error(error);
-        LanzarError('Error al actualizar color', 500, 'Error');
 
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return LanzarError('El color ya existe', 400, 'Alerta');
+        }
+
+        throw error;
     }
 
 };
