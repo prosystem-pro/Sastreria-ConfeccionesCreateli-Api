@@ -462,7 +462,9 @@ const CrearVenta = async (datos, usuario) => {
         // PRODUCTOS
         // ==============================
         for (const item of Productos) {
-
+            if (!Number.isInteger(item.Cantidad) || item.Cantidad <= 0) {
+                LanzarError(`Cantidad inválida en producto ${item.CodigoInventario}`, 400);
+            }
             const inventario = await InventarioRelacion.findOne({
                 where: {
                     CodigoInventario: item.CodigoInventario,
@@ -471,6 +473,16 @@ const CrearVenta = async (datos, usuario) => {
                 transaction,
                 lock: transaction.LOCK.UPDATE
             });
+
+            if (!inventario)
+                LanzarError(`Producto ${item.CodigoInventario} no existe`, 404);
+
+            if (item.Cantidad > inventario.StockActual) {
+                LanzarError(
+                    `Stock insuficiente del producto ${item.CodigoInventario}. Disponible: ${inventario.StockActual}`,
+                    400
+                );
+            }
 
             if (!inventario)
                 LanzarError(`Producto ${item.CodigoInventario} no existe`, 404);
