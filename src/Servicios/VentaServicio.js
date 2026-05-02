@@ -150,9 +150,7 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
                 documento: venta.NumeroDocumento,
                 // fecha: fechaVenta,
 
-                fecha: venta.FechaCreacion
-                    ? UTCAGuatemala_FechaHora(venta.FechaCreacion)
-                    : null,
+                fecha: venta.FechaCreacion || null,
                 fechaEntrega: venta.FechaEntrega
                     ? FormatoFecha(venta.FechaEntrega)
                     : '',
@@ -346,7 +344,7 @@ const ObtenerVenta = async (CodigoPedido) => {
             TotalAbonado: totalAbonado,
             SaldoPendiente: saldoPendiente,
 
-            FechaCreacion: venta.FechaCreacion || null,
+            FechaCreacion: UTCAGuatemala_FechaHora(venta.FechaCreacion),
             FechaEntrega: venta.FechaEntrega || null
 
         };
@@ -747,7 +745,7 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
 
 
         // ================= FECHAS =================
-        const fechaVenta = new Date().toLocaleDateString();
+        const fechaVenta = venta.FechaCreacion;
 
 
         // ================= PDF =================
