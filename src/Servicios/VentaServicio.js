@@ -20,6 +20,7 @@ const {
     UsuarioModelo,
     ClienteModelo
 } = require('../Relaciones/Relaciones');
+
 const { UTCAGuatemala_FechaHora,
     FormatoFecha,
     GuatemalaAUTC,
@@ -1318,10 +1319,9 @@ const ListadoVentas = async () => {
             order: [['FechaCreacion', 'DESC']]
         });
 
-        // Transformar datos para el frontend
-        return ventas.map(v => ({
+        const resultado = ventas.map(v => ({
             CodigoPedido: v.CodigoPedido,
-            Fecha: v.FechaCreacion,
+            Fecha: UTCAGuatemala_FechaHora(v.FechaCreacion),
             Total: v.Total,
             Cliente: v.CaCliente?.NombreCliente || 'Sin cliente',
             Usuario: v.AdUsuario?.NombreUsuario || 'Desconocido',
@@ -1331,6 +1331,7 @@ const ListadoVentas = async () => {
             })) || []
         }));
 
+        return resultado;
     } catch (error) {
         console.error(error);
         LanzarError('Error al obtener listado de ventas', 500, 'Error');
