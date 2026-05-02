@@ -816,6 +816,7 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
         }
 
         // ================= FINAL =================
+
         doc.end();
 
     } catch (error) {

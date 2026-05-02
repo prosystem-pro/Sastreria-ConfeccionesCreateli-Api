@@ -725,7 +725,10 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
             const nombreFormaPago =
                 mapaFormaPago[p.FnPago?.CodigoFormaPago] || 'Sin forma';
 
-            if (nombreFormaPago.toLowerCase().includes('tarjeta')) {
+            if (
+                nombreFormaPago.toLowerCase().includes('tarjeta') ||
+                nombreFormaPago.toLowerCase().includes('transfer')
+            ) {
 
                 tarjetaPago = {
                     nombre: nombreFormaPago,
