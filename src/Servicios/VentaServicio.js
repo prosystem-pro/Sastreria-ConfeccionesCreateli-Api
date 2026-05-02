@@ -18,7 +18,8 @@ const {
     EstadoPedidoModelo,
     MovimientoInventarioModelo,
     UsuarioModelo,
-    ClienteModelo
+    ClienteModelo,
+    TipoProductoModelo
 } = require('../Relaciones/Relaciones');
 
 const { UTCAGuatemala_FechaHora,
@@ -1219,20 +1220,20 @@ const EliminarVenta = async (CodigoPedido, usuario) => {
 const ListadoProducto = async () => {
 
     try {
-
         const productos = await InventarioRelacion.findAll({
 
             where: {
                 Estatus: 1,
-                StockActual: {
-                    [Op.gt]: 0
-                }
+                // StockActual: {
+                //     [Op.gt]: 0
+                // }
             },
 
             attributes: [
                 'CodigoInventario',
                 'CodigoBarras',
-                'PrecioVenta'
+                'PrecioVenta',
+                'StockActual'
             ],
 
             include: [
@@ -1243,6 +1244,16 @@ const ListadoProducto = async () => {
                         'CodigoProducto',
                         'NombreProducto',
                         'PrecioBase'
+                    ],
+                    include: [
+                        {
+                            model: TipoProductoModelo,
+                            as: 'TipoProducto',
+                            attributes: ['NombreTipoProducto'],
+                            where: {
+                                NombreTipoProducto: 'FISICO'
+                            }
+                        }
                     ]
                 }
             ],
@@ -1253,18 +1264,21 @@ const ListadoProducto = async () => {
 
         });
 
-        return productos.map(p => ({
+        const resultado = productos.map(p => ({
 
             CodigoInventario: p.CodigoInventario,
-            CodigoBarras: p.CodigoBarras,  // ✅ se envía
+            CodigoBarras: p.CodigoBarras,
 
             CodigoProducto: p.Producto?.CodigoProducto,
             NombreProducto: p.Producto?.NombreProducto,
 
             PrecioVenta: p.PrecioVenta,
-            PrecioBase: p.Producto?.PrecioBase
+            PrecioBase: p.Producto?.PrecioBase,
+            StockActual: p.StockActual
 
         }));
+
+        return resultado;
 
     } catch (error) {
 
