@@ -9,35 +9,25 @@ const {
 } = require('../Relaciones/Relaciones');
 
 const { LanzarError } = require('../Utilidades/ErrorServicios');
-const ReportePedidos = async (FechaInicio, FechaFin) => {
+const ReportePedidos = async (FechaInicio, FechaFin, CodigoEmpresa) => {
 
     try {
 
         let filtroPedido = {
             Estatus: 1,
-            TipoDocumento: 'PEDIDO'
+            TipoDocumento: 'PEDIDO',
+            CodigoEmpresa: CodigoEmpresa 
         };
 
-        let filtroPago = {
-            Estatus: 1
-        };
+if (FechaInicio && FechaFin) {
+    filtroPedido.FechaCreacion = {
+        [Op.between]: [
+            `${FechaInicio} 00:00:00`,
+            `${FechaFin} 23:59:59`
+        ]
+    };
+}
 
-        if (FechaInicio && FechaFin) {
-
-            filtroPedido.FechaCreacion = {
-                [Op.between]: [
-                    `${FechaInicio} 00:00:00`,
-                    `${FechaFin} 23:59:59`
-                ]
-            };
-
-            filtroPago.FechaPago = {
-                [Op.between]: [
-                    `${FechaInicio} 00:00:00`,
-                    `${FechaFin} 23:59:59`
-                ]
-            };
-        }
 
         // ================= TOTAL PEDIDOS =================
         const pedidos = await PedidoModelo.findAll({
@@ -82,7 +72,7 @@ const ReportePedidos = async (FechaInicio, FechaFin) => {
                     model: PagoModelo,
                     as: 'FnPago',
                     attributes: [],
-                    where: filtroPago,
+                    where: { Estatus: 1 },
                     required: true
                 },
 
@@ -128,7 +118,98 @@ const ReportePedidos = async (FechaInicio, FechaFin) => {
         );
     }
 };
+const ReportePedidosAnexo = async (FechaInicio, FechaFin, CodigoEmpresa) => {
 
+    try {
+
+        let filtroPedido = {
+            Estatus: 1,
+            TipoDocumento: 'PEDIDO',
+            CodigoEmpresa: { [Op.ne]: CodigoEmpresa } // ✅ CAMBIO CLAVE
+        };
+
+        if (FechaInicio && FechaFin) {
+            filtroPedido.FechaCreacion = {
+                [Op.between]: [
+                    `${FechaInicio} 00:00:00`,
+                    `${FechaFin} 23:59:59`
+                ]
+            };
+        }
+
+        // ================= TOTAL PEDIDOS =================
+        const pedidos = await PedidoModelo.findAll({
+
+            attributes: [
+                [Sequelize.fn('COUNT', Sequelize.col('CodigoPedido')), 'TotalPedidos'],
+                [Sequelize.fn('SUM', Sequelize.col('Total')), 'MontoPedidos']
+            ],
+
+            where: filtroPedido,
+            raw: true
+        });
+
+        // ================= TOTAL ABONOS =================
+        const abonos = await PagoAplicacionModelo.findAll({
+
+            attributes: [
+                [Sequelize.fn('SUM', Sequelize.col('MontoAplicado')), 'TotalAbono']
+            ],
+
+            where: {
+                TipoDocumento: 'PEDIDO'
+            },
+
+            include: [
+
+                {
+                    model: PagoModelo,
+                    as: 'FnPago',
+                    attributes: [],
+                    where: { Estatus: 1 },
+                    required: true
+                },
+
+                {
+                    model: PedidoModelo,
+                    as: 'Pedido',
+                    attributes: [],
+                    where: filtroPedido, // ✅ mismo filtro (ya excluye empresa)
+                    required: true
+                }
+
+            ],
+
+            raw: true
+        });
+
+        const dataPedidos = pedidos[0] || {};
+        const dataAbonos = abonos[0] || {};
+
+        const TotalPedidos = Number(dataPedidos.TotalPedidos || 0);
+        const MontoPedidos = Number(dataPedidos.MontoPedidos || 0);
+        const TotalAbono = Number(dataAbonos.TotalAbono || 0);
+
+        const SaldoPendiente = MontoPedidos - TotalAbono;
+
+        return {
+            TotalPedidos,
+            MontoPedidos,
+            TotalAbono,
+            SaldoPendiente
+        };
+
+    } catch (error) {
+
+        console.error('Error en ReportePedidosAnexo:', error);
+
+        LanzarError(
+            'Error al generar reporte de pedidos anexo',
+            500,
+            'Error'
+        );
+    }
+};
 const ReporteVentas = async (FechaInicio, FechaFin) => {
 
     try {
@@ -190,5 +271,5 @@ const ReporteVentas = async (FechaInicio, FechaFin) => {
     }
 };
 module.exports = {
-    ReporteVentas, ReportePedidos
+    ReporteVentas, ReportePedidos, ReportePedidosAnexo
 };

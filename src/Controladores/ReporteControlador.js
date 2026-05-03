@@ -35,9 +35,12 @@ const ReportePedidos = async (req, res) => {
 
         const { FechaInicio, FechaFin } = req.query;
 
+        const CodigoEmpresa = req.Datos.CodigoEmpresa;
+
         const Objeto = await Servicio.ReportePedidos(
             FechaInicio,
-            FechaFin
+            FechaFin,
+            CodigoEmpresa 
         );
 
         return ResponderExito(
@@ -57,8 +60,37 @@ const ReportePedidos = async (req, res) => {
     }
 };
 
+const ReportePedidosAnexo = async (req, res) => {
+    try {
+
+        const { FechaInicio, FechaFin } = req.query;
+
+        const CodigoEmpresa = req.Datos.CodigoEmpresa;
+
+        const Objeto = await Servicio.ReportePedidosAnexo(
+            FechaInicio,
+            FechaFin,
+            CodigoEmpresa
+        );
+
+        return ResponderExito(
+            res,
+            'Reporte de pedidos anexo generado correctamente.',
+            Objeto || {}
+        );
+
+    } catch (error) {
+
+        return ManejarError(
+            error,
+            res,
+            'Error al generar el reporte de pedidos anexo'
+        );
+
+    }
+};
 module.exports = {
 
-    ReporteVentas, ReportePedidos
+    ReporteVentas, ReportePedidos, ReportePedidosAnexo
 
 };
