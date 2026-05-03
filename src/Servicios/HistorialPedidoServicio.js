@@ -2068,7 +2068,10 @@ const ListadoProducto = async (CodigoTipoProducto = null) => {
                     model: InventarioModelo,
                     as: 'Inventarios',
                     attributes: [],
-                    required: true
+                    required: true,
+                    where: {
+                        Estatus: 1
+                    }
                 }
             ],
 
