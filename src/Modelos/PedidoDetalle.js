@@ -39,6 +39,10 @@ module.exports = function(sequelize, DataTypes) {
         key: 'CodigoTela'
       }
     },
+    NombreTelaAleatorio: {
+      type: DataTypes.STRING(128),
+      allowNull: true
+    },
     CodigoTipoCuello: {
       type: DataTypes.INTEGER,
       allowNull: true,

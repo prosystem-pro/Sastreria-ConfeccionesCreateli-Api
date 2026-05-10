@@ -71,7 +71,7 @@ const ObtenerDatosImpresionPagoPedido = async (req, res) => {
 const CrearPedido = async (req, res) => {
   try {
 
-    const { CodigoUsuario, CodigoEmpresa, SuperAdmin } = req.Datos;
+    const { CodigoUsuario, CodigoEmpresa, SuperAdmin, NombreRol } = req.Datos;
 
     if (SuperAdmin) {
       LanzarError('SuperAdmin no puede crear pedidos sin empresa', 403);
@@ -80,7 +80,8 @@ const CrearPedido = async (req, res) => {
     const Objeto = await Servicio.CrearPedido(
       req.body,
       CodigoUsuario,
-      CodigoEmpresa
+      CodigoEmpresa,
+      NombreRol
     );
 
     return ResponderExito(
@@ -109,7 +110,6 @@ const ObtenerPedido = async (req, res) => {
     }
 
     const Objeto = await Servicio.ObtenerPedido(CodigoPedido);
-
     return ResponderExito(
       res,
       'Pedido obtenido correctamente.',
@@ -132,12 +132,13 @@ const ActualizarPedido = async (req, res) => {
     const datos = req.body;
 
     const CodigoUsuario = req.Datos.CodigoUsuario;
+    const NombreRol = req.Datos.NombreRol;
 
     if (!datos.CodigoPedido) {
       LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
     }
 
-    const Objeto = await Servicio.ActualizarPedido(datos, CodigoUsuario);
+    const Objeto = await Servicio.ActualizarPedido(datos, CodigoUsuario, NombreRol);
 
     return ResponderExito(
       res,

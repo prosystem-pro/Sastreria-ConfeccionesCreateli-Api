@@ -30,7 +30,7 @@ const { GenerarDocumento } = require('../Utilidades/GeneradorDocumento');
 const { LanzarError } = require('../Utilidades/ErrorServicios');
 const { Op, literal } = require('sequelize');
 
-const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
+const CrearPedido = async (datos, usuario, CodigoEmpresa, NombreRol) => {
     const transaccion = await BaseDatos.transaction();
 
     try {
@@ -136,13 +136,20 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
                 stockAnterior = inventario.StockActual;
                 stockNuevo = stockAnterior - producto.Cantidad;
             }
+            // ================= EMPRESA_ASOCIADA =================
 
+            const NombreTelaAleatorio =
+                NombreRol === 'EMPRESA_ASOCIADA'
+                    ? producto.NombreTela || null
+                    : null;
             const detalle = await PedidoDetalleModelo.create({
                 CodigoPedido: pedido.CodigoPedido,
                 CodigoInventario: inventario.CodigoInventario,
 
                 CodigoTipoTela: producto.CodigoTipoTela || null,
                 CodigoTela: producto.CodigoTela || null,
+
+                NombreTelaAleatorio: NombreTelaAleatorio,
 
                 Codigo: producto.Codigo || null,
                 Color: producto.Color || null,
@@ -220,7 +227,7 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
         }
         // ================= PAGO INICIAL (SI EXISTE) =================
         // 🔥 SOLO SI NO ES EMPRESA_OFICIAL
-      
+
         if (datos.MontoPago && datos.FormaPago) {
 
             const documentoPago = await GenerarDocumento(
@@ -286,7 +293,7 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa) => {
         throw error;
     }
 };
-const ActualizarPedido = async (datos, usuario) => {
+const ActualizarPedido = async (datos, usuario, NombreRol) => {
 
     const transaccion = await BaseDatos.transaction();
 
@@ -417,6 +424,11 @@ const ActualizarPedido = async (datos, usuario) => {
                     400,
                     'Advertencia'
                 );
+            // ================= EMPRESA_ASOCIADA =================
+            const NombreTelaAleatorio =
+                NombreRol === 'EMPRESA_ASOCIADA'
+                    ? producto.NombreTela || null
+                    : null;
 
             const detalle = await PedidoDetalleModelo.create({
 
@@ -425,6 +437,8 @@ const ActualizarPedido = async (datos, usuario) => {
 
                 CodigoTipoTela: producto.CodigoTipoTela || null,
                 CodigoTela: producto.CodigoTela || null,
+
+                NombreTelaAleatorio: NombreTelaAleatorio,
 
                 Codigo: producto.Codigo || null,
                 Color: producto.Color || null,
@@ -1433,7 +1447,10 @@ const ObtenerPedido = async (CodigoPedido) => {
                 else
                     medidas[nombre] = null;
             }
-
+            
+            if (medidas.Botones != null) {
+                medidas.Botones = String(medidas.Botones);
+            }
             productos.push({
                 CodigoProducto: det.Inventario?.Producto?.CodigoProducto || null,
                 NombreProducto: det.Inventario?.Producto?.NombreProducto || '',
@@ -1442,7 +1459,7 @@ const ObtenerPedido = async (CodigoPedido) => {
                 CodigoTipoTela: det.CodigoTipoTela || null,
                 NombreTipoTela: det.TipoTela?.NombreTipoTela || '',
                 CodigoTela: det.CodigoTela || null,
-                NombreTela: det.Tela?.NombreTela || '',
+                NombreTela: det.NombreTelaAleatorio || det.Tela?.NombreTela || '',
                 Codigo: det.Codigo || null,
                 Color: det.Color || '',
                 Referencia: det.Referencia || '',

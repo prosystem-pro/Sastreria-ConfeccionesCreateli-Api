@@ -25,7 +25,7 @@ const {
 const { UTCAGuatemala_FechaHora,
     FormatoFecha,
     GuatemalaAUTC,
-    FormatoFechaDesdeDateTime } = require('../Utilidades/ConversionFechas');
+    FormatoFechaDesdeDateTime, RangoGuatemalaAUTC } = require('../Utilidades/ConversionFechas');
 
 const { Op } = require('sequelize');
 const { LanzarError } = require('../Utilidades/ErrorServicios');
@@ -363,7 +363,6 @@ const ObtenerVenta = async (CodigoPedido) => {
 
 // CREAR VENTA (USANDO PEDIDO)
 const CrearVenta = async (datos, usuario) => {
-
     let transaction;
 
     try {
@@ -946,10 +945,16 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
 
 
         // ===== DERECHA FILA 2 =====
-        doc.text('Descuento:', xDerLabel, totalesY);
+        doc.text(
+            `Descuento (${venta.Descuento || 0}%):`,
+            xDerLabel,
+            totalesY
+        );
 
         doc.text(
-            `Q ${venta.Descuento.toFixed(2)}`,
+            `Q ${(
+                venta.Subtotal * ((venta.Descuento || 0) / 100)
+            ).toFixed(2)}`,
             xDerMonto,
             totalesY,
             { width: anchoMonto, align: 'right' }
@@ -1308,22 +1313,67 @@ const ListadoProducto = async () => {
 };
 
 // LISTADO DE VENTAS
-const ListadoVentas = async () => {
+const ListadoVentas = async (FechaInicio, FechaFin) => {
     try {
+
+        // ================= FILTRO =================
+        const whereFecha = {
+            Estatus: 1
+        };
+
+        // ================= FECHAS =================
+        if (
+            FechaInicio &&
+            FechaFin &&
+            FechaInicio !== 'undefined' &&
+            FechaFin !== 'undefined'
+        ) {
+
+            // 🔥 GUATEMALA → UTC
+            const {
+                inicioUTC,
+                finUTC
+            } = RangoGuatemalaAUTC(
+                FechaInicio,
+                FechaFin
+            );
+
+            whereFecha.FechaCreacion = {
+                [Op.between]: [
+                    inicioUTC,
+                    finUTC
+                ]
+            };
+        }
+
         const ventas = await PedidoModelo.findAll({
-            where: { Estatus: 1 }, // sigue filtrando solo los activos
-            attributes: ['CodigoPedido', 'FechaCreacion', 'Subtotal', 'Descuento', 'Total'],
+
+            where: whereFecha,
+
+            attributes: [
+                'CodigoPedido',
+                'FechaCreacion',
+                'Subtotal',
+                'Descuento',
+                'Total'
+            ],
+
             include: [
                 {
                     model: EstadoPedidoModelo,
                     as: 'CaEstadoPedido',
                     attributes: ['NombreEstadoPedido'],
-                    where: { NombreEstadoPedido: 'VENDIDO' } // ✅ solo VENDIDO
+                    where: {
+                        NombreEstadoPedido: 'VENDIDO'
+                    }
                 },
                 {
                     model: PagoAplicacionModelo,
                     as: 'PagosAplicados',
-                    attributes: ['CodigoPagoAplicacion', 'MontoAplicado'],
+                    attributes: [
+                        'CodigoPagoAplicacion',
+                        'MontoAplicado'
+                    ],
                     include: [
                         {
                             model: PagoModelo,
@@ -1343,25 +1393,46 @@ const ListadoVentas = async () => {
                     attributes: ['NombreCliente']
                 }
             ],
+
             order: [['FechaCreacion', 'DESC']]
         });
 
         const resultado = ventas.map(v => ({
             CodigoPedido: v.CodigoPedido,
-            Fecha: UTCAGuatemala_FechaHora(v.FechaCreacion),
+
+            Fecha: UTCAGuatemala_FechaHora(
+                v.FechaCreacion
+            ),
+
             Total: v.Total,
-            Cliente: v.CaCliente?.NombreCliente || 'Sin cliente',
-            Usuario: v.AdUsuario?.NombreUsuario || 'Desconocido',
-            Pagos: v.PagosAplicados?.map(p => ({
-                MontoAplicado: p.MontoAplicado,
-                MontoPago: p.FnPago?.Monto || 0
-            })) || []
+
+            Cliente:
+                v.CaCliente?.NombreCliente ||
+                'Sin cliente',
+
+            Usuario:
+                v.AdUsuario?.NombreUsuario ||
+                'Desconocido',
+
+            Pagos:
+                v.PagosAplicados?.map(p => ({
+                    MontoAplicado: p.MontoAplicado,
+                    MontoPago:
+                        p.FnPago?.Monto || 0
+                })) || []
         }));
 
         return resultado;
+
     } catch (error) {
+
         console.error(error);
-        LanzarError('Error al obtener listado de ventas', 500, 'Error');
+
+        LanzarError(
+            'Error al obtener listado de ventas',
+            500,
+            'Error'
+        );
     }
 };
 

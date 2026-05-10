@@ -11,7 +11,6 @@ const ObtenerDatosImpresion = async (req, res) => {
         const { CodigoPedido } = req.params;
 
         const datos = await Servicio.ObtenerDatosImpresion(CodigoPedido);
-
         return ResponderExito(
             res,
             'Datos de impresión obtenidos correctamente.',
@@ -114,8 +113,15 @@ const ListadoProducto = async (req, res) => {
 // =============================
 const ListadoVentas = async (req, res) => {
     try {
+        const {
+            FechaInicio,
+            FechaFin
+        } = req.query;
 
-        const ventas = await Servicio.ListadoVentas();
+        const ventas = await Servicio.ListadoVentas(
+            FechaInicio,
+            FechaFin
+        );
 
         return ResponderExito(
             res,
@@ -169,5 +175,5 @@ const EliminarVenta = async (req, res) => {
 };
 
 module.exports = {
-    ListadoProducto, CrearVenta, ListadoVentas, EliminarVenta,GenerarPDFVenta, ObtenerDatosImpresion
+    ListadoProducto, CrearVenta, ListadoVentas, EliminarVenta, GenerarPDFVenta, ObtenerDatosImpresion
 };
