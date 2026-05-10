@@ -44,9 +44,37 @@ const FormatoFechaDesdeDateTime = (fecha) => {
     return DateTime.fromJSDate(new Date(fecha))
         .toFormat('dd/MM/yyyy');
 };
+
+const RangoGuatemalaAUTC = (fechaInicio, fechaFin) => {
+
+    if (!fechaInicio || !fechaFin) {
+        return null;
+    }
+
+    const inicioUTC = DateTime
+        .fromISO(`${fechaInicio}T00:00:00`, {
+            zone: ZONA_GUATEMALA
+        })
+        .toUTC()
+        .toFormat('yyyy-MM-dd HH:mm:ss');
+
+    const finUTC = DateTime
+        .fromISO(`${fechaFin}T23:59:59`, {
+            zone: ZONA_GUATEMALA
+        })
+        .toUTC()
+        .toFormat('yyyy-MM-dd HH:mm:ss');
+
+    return {
+        inicioUTC,
+        finUTC
+    };
+};
+
 module.exports = {
     GuatemalaAUTC,
     UTCAGuatemala_FechaHora,
     FormatoFecha,
-    FormatoFechaDesdeDateTime
+    FormatoFechaDesdeDateTime,
+    RangoGuatemalaAUTC
 };

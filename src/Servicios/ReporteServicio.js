@@ -8,26 +8,56 @@ const {
     PagoAplicacionModelo
 } = require('../Relaciones/Relaciones');
 
+const {
+    RangoGuatemalaAUTC
+} = require('../Utilidades/ConversionFechas');
+
 const { LanzarError } = require('../Utilidades/ErrorServicios');
-const ReportePedidos = async (FechaInicio, FechaFin, CodigoEmpresa) => {
+const ReportePedidos = async (
+    FechaInicio,
+    FechaFin,
+    CodigoEmpresa
+) => {
 
     try {
+
+        // ✅ VALIDAR FECHAS
+        if (
+            !FechaInicio ||
+            !FechaFin ||
+            FechaInicio === 'undefined' ||
+            FechaFin === 'undefined'
+        ) {
+
+            return {
+                TotalPedidos: 0,
+                MontoPedidos: 0,
+                TotalAbono: 0,
+                SaldoPendiente: 0
+            };
+        }
 
         let filtroPedido = {
             Estatus: 1,
             TipoDocumento: 'PEDIDO',
-            CodigoEmpresa: CodigoEmpresa 
+            CodigoEmpresa: CodigoEmpresa
         };
 
-if (FechaInicio && FechaFin) {
-    filtroPedido.FechaCreacion = {
-        [Op.between]: [
-            `${FechaInicio} 00:00:00`,
-            `${FechaFin} 23:59:59`
-        ]
-    };
-}
+        // 🔥 CONVERTIR RANGO GUATEMALA → UTC
+        const {
+            inicioUTC,
+            finUTC
+        } = RangoGuatemalaAUTC(
+            FechaInicio,
+            FechaFin
+        );
 
+        filtroPedido.FechaCreacion = {
+            [Op.between]: [
+                inicioUTC,
+                finUTC
+            ]
+        };
 
         // ================= TOTAL PEDIDOS =================
         const pedidos = await PedidoModelo.findAll({
@@ -35,12 +65,18 @@ if (FechaInicio && FechaFin) {
             attributes: [
 
                 [
-                    Sequelize.fn('COUNT', Sequelize.col('CodigoPedido')),
+                    Sequelize.fn(
+                        'COUNT',
+                        Sequelize.col('CodigoPedido')
+                    ),
                     'TotalPedidos'
                 ],
 
                 [
-                    Sequelize.fn('SUM', Sequelize.col('Total')),
+                    Sequelize.fn(
+                        'SUM',
+                        Sequelize.col('Total')
+                    ),
                     'MontoPedidos'
                 ]
 
@@ -48,6 +84,7 @@ if (FechaInicio && FechaFin) {
 
             where: filtroPedido,
             raw: true
+
         });
 
         // ================= TOTAL ABONOS =================
@@ -56,7 +93,10 @@ if (FechaInicio && FechaFin) {
             attributes: [
 
                 [
-                    Sequelize.fn('SUM', Sequelize.col('MontoAplicado')),
+                    Sequelize.fn(
+                        'SUM',
+                        Sequelize.col('MontoAplicado')
+                    ),
                     'TotalAbono'
                 ]
 
@@ -72,7 +112,9 @@ if (FechaInicio && FechaFin) {
                     model: PagoModelo,
                     as: 'FnPago',
                     attributes: [],
-                    where: { Estatus: 1 },
+                    where: {
+                        Estatus: 1
+                    },
                     required: true
                 },
 
@@ -87,16 +129,26 @@ if (FechaInicio && FechaFin) {
             ],
 
             raw: true
+
         });
 
         const dataPedidos = pedidos[0] || {};
         const dataAbonos = abonos[0] || {};
 
-        const TotalPedidos = Number(dataPedidos.TotalPedidos || 0);
-        const MontoPedidos = Number(dataPedidos.MontoPedidos || 0);
-        const TotalAbono = Number(dataAbonos.TotalAbono || 0);
+        const TotalPedidos = Number(
+            dataPedidos.TotalPedidos || 0
+        );
 
-        const SaldoPendiente = MontoPedidos - TotalAbono;
+        const MontoPedidos = Number(
+            dataPedidos.MontoPedidos || 0
+        );
+
+        const TotalAbono = Number(
+            dataAbonos.TotalAbono || 0
+        );
+
+        const SaldoPendiente =
+            MontoPedidos - TotalAbono;
 
         return {
 
@@ -109,7 +161,10 @@ if (FechaInicio && FechaFin) {
 
     } catch (error) {
 
-        console.error('Error en ReportePedidos:', error);
+        console.error(
+            'Error en ReportePedidos:',
+            error
+        );
 
         LanzarError(
             'Error al generar reporte de pedidos',
@@ -214,32 +269,58 @@ const ReporteVentas = async (FechaInicio, FechaFin) => {
 
     try {
 
+        // ✅ VALIDAR FECHAS
+        if (
+            !FechaInicio ||
+            !FechaFin ||
+            FechaInicio === 'undefined' ||
+            FechaFin === 'undefined'
+        ) {
+
+            return {
+                TotalVentas: 0,
+                MontoVentas: 0
+            };
+        }
+
         let where = {
             Estatus: 1,
             TipoDocumento: 'VENTA'
         };
 
-        if (FechaInicio && FechaFin) {
+        // 🔥 CONVERTIR RANGO GUATEMALA → UTC
+        const {
+            inicioUTC,
+            finUTC
+        } = RangoGuatemalaAUTC(
+            FechaInicio,
+            FechaFin
+        );
 
-            where.FechaCreacion = {
-                [Op.between]: [
-                    `${FechaInicio} 00:00:00`,
-                    `${FechaFin} 23:59:59`
-                ]
-            };
-        }
+        where.FechaCreacion = {
+            [Op.between]: [
+                inicioUTC,
+                finUTC
+            ]
+        };
 
         const ventas = await PedidoModelo.findAll({
 
             attributes: [
 
                 [
-                    Sequelize.fn('COUNT', Sequelize.col('CodigoPedido')),
+                    Sequelize.fn(
+                        'COUNT',
+                        Sequelize.col('CodigoPedido')
+                    ),
                     'TotalVentas'
                 ],
 
                 [
-                    Sequelize.fn('SUM', Sequelize.col('Total')),
+                    Sequelize.fn(
+                        'SUM',
+                        Sequelize.col('Total')
+                    ),
                     'MontoVentas'
                 ]
 
@@ -254,14 +335,22 @@ const ReporteVentas = async (FechaInicio, FechaFin) => {
 
         return {
 
-            TotalVentas: Number(data.TotalVentas || 0),
-            MontoVentas: Number(data.MontoVentas || 0)
+            TotalVentas: Number(
+                data.TotalVentas || 0
+            ),
+
+            MontoVentas: Number(
+                data.MontoVentas || 0
+            )
 
         };
 
     } catch (error) {
 
-        console.error('Error en ReporteVentas:', error);
+        console.error(
+            'Error en ReporteVentas:',
+            error
+        );
 
         LanzarError(
             'Error al generar reporte de ventas',
