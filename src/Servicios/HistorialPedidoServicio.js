@@ -298,7 +298,6 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
     const transaccion = await BaseDatos.transaction();
 
     try {
-
         if (!datos.CodigoPedido)
             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
 
@@ -349,7 +348,7 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
                 transaction: transaccion
             });
 
-            if (inventario) {
+            if (inventario && det.NombreTipoProducto?.toUpperCase() === 'FISICO') {
 
                 await inventario.update({
                     StockActual: inventario.StockActual + det.Cantidad
@@ -370,7 +369,7 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
             return `${anio}-${mes}-${dia}`;
         };
         // ===================== ACTUALIZAR ENCABEZADO =====================
-        await pedido.update({
+        const datosActualizar = {
 
             CodigoCliente: datos.CodigoCliente,
             CodigoEstadoPedido: datos.CodigoEstadoPedido,
@@ -379,8 +378,13 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
             Subtotal: datos.Subtotal,
             Descuento: datos.Descuento,
             Total: datos.Total
+        };
 
-        }, { transaction: transaccion });
+        // ===================== ACTUALIZAR ENCABEZADO =====================
+        await pedido.update(
+            datosActualizar,
+            { transaction: transaccion }
+        );
 
         // ===================== INSERTAR NUEVOS PRODUCTOS =====================
         for (const producto of datos.Productos) {
@@ -486,9 +490,10 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
             }
 
             // ===================== DESCONTAR STOCK =====================
+
             if (esFisico) {
                 await inventario.update({
-                    StockActual: inventario.StockActual - producto.Cantidad
+                    StockActual: inventario.StockActual + det.Cantidad
                 }, { transaction: transaccion });
             }
         }
@@ -1256,9 +1261,6 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         }, { transaction: transaccion });
 
         // ================= ACTUALIZAR PEDIDO =================
-        await pedido.update({
-            CodigoEstadoPedido: saldoPendiente === 0 ? 2 : 1
-        }, { transaction: transaccion });
 
         await transaccion.commit();
 
@@ -1282,8 +1284,6 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         throw error;
     }
 };
-
-
 
 const ObtenerPedido = async (CodigoPedido) => {
     try {
@@ -1447,7 +1447,7 @@ const ObtenerPedido = async (CodigoPedido) => {
                 else
                     medidas[nombre] = null;
             }
-            
+
             if (medidas.Botones != null) {
                 medidas.Botones = String(medidas.Botones);
             }
@@ -1885,8 +1885,15 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = fals
                     model: UsuarioModelo,
                     as: 'AdUsuario',
                     attributes: ['NombreUsuario']
+                },
+                // ===================== NUEVO INCLUDE =====================
+                {
+                    model: EmpresaModelo,
+                    as: 'AdEmpresa',
+                    attributes: ['NombreEmpresa']
                 }
             ],
+
             order: [['FechaCreacion', 'DESC']]
         });
 
@@ -1914,7 +1921,9 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = fals
             resultado.push({
                 CodigoPedido: p.CodigoPedido,
                 CodigoEmpresa: p.CodigoEmpresa,
-                NombreEmpresa: NombreEmpresa,
+                NombreEmpresa: verOtros
+                    ? (p.AdEmpresa?.NombreEmpresa || 'Sin empresa')
+                    : NombreEmpresa,
                 NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
                 FechaCreacion: UTCAGuatemala_FechaHora(p.FechaCreacion),
                 FechaEntrega: FormatoFecha(p.FechaEntrega),
@@ -2022,7 +2031,7 @@ const Obtener = async (codigoPedido) => {
 
     }
 };
-const ListadoTipoProducto = async () => {
+const ListadoTipoProducto = async (NombreRol) => {
 
     try {
 
@@ -2041,19 +2050,26 @@ const ListadoTipoProducto = async () => {
 
         });
 
-        return tipos.map(t => ({
+        const data = tipos.map(t => ({
             CodigoTipoProducto: t.CodigoTipoProducto,
             NombreTipoProducto: t.NombreTipoProducto
         }));
+
+        if (NombreRol === 'EMPRESA_ASOCIADA') {
+
+            return data.filter(t =>
+                t.NombreTipoProducto === 'CONFECCION'
+            );
+        }
+
+        return data;
 
     } catch (error) {
 
         console.error(error);
 
         LanzarError('Error al obtener tipos de producto', 500, 'Error');
-
     }
-
 };
 const ListadoProducto = async (CodigoTipoProducto = null) => {
     try {

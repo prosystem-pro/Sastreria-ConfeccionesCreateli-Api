@@ -82,7 +82,8 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
             CodigoTela,
             Precio,
             Stock,
-            Estatus
+            Estatus,
+            NombreProducto
         } = Datos;
 
         if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
@@ -140,7 +141,11 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
             CodigoTela,
             PrecioVenta: Precio,
             StockActual: Stock,
-            Estatus
+            Estatus,
+
+            ...(NombreProducto && {
+                NombreProducto: NormalizarNombre(NombreProducto)
+            })
         }, { transaction: Transaccion });
 
         // =========================
@@ -176,7 +181,16 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
     }
 
 };
+const NormalizarNombre = (texto) => {
+    if (!texto) return '';
 
+    return texto
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/[^a-zA-Z\s]/g, '')
+        .toLowerCase()
+        .replace(/\b\w/g, c => c.toUpperCase());
+};
 const CrearProductoInventario = async (Datos, CodigoUsuario) => {
     const Transaccion = await BaseDatos.transaction();
 
@@ -218,17 +232,37 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
         // =========================
         // VALIDAR PRODUCTO DUPLICADO
         // =========================
+        const NombreProductoLimpio = NormalizarNombre(NombreProducto);
+  // 1. Buscar producto por nombre
+const ProductoExistente = await ProductoModelo.findOne({
+    where: {
+        NombreProducto: NombreProductoLimpio,
+        CodigoEmpresa
+    },
+    transaction: Transaccion
+});
 
-        const ExisteProducto = await ProductoModelo.findOne({
-            where: {
-                NombreProducto,
-                CodigoEmpresa
-            },
-            transaction: Transaccion
-        });
+if (ProductoExistente) {
 
-        if (ExisteProducto)
+    // 2. Buscar inventario de ese producto
+    const InventarioExistente = await InventarioModelo.findOne({
+        where: {
+            CodigoProducto: ProductoExistente.CodigoProducto
+        },
+        transaction: Transaccion
+    });
+
+    if (InventarioExistente) {
+
+        if (InventarioExistente.Estatus === 1) {
             LanzarError('El producto ya existe', 400);
+        }
+
+        if (InventarioExistente.Estatus === 3) {
+            LanzarError('El producto ya existe en productos eliminados. Debe restaurarlo.', 400);
+        }
+    }
+}
 
         // =========================
         // 1. CREAR PRODUCTO
@@ -237,7 +271,7 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
         const ProductoDB = await ProductoModelo.create({
             CodigoEmpresa,
             CodigoTipoProducto,
-            NombreProducto,
+            NombreProducto: NombreProductoLimpio,
             PrecioBase: Precio,
             Estatus: 1
         }, { transaction: Transaccion });
@@ -343,6 +377,10 @@ const ObtenerInventarioPorCodigo = async (CodigoInventario) => {
     }
 };
 
+
+module.exports = {
+    NormalizarNombre
+};
 //CORREGIDOS
 
 const ObtenerInventarioListado = async (CodigoEmpresa) => {
@@ -495,8 +533,8 @@ const ObtenerInventarioEliminados = async (CodigoEmpresa) => {
         if (!CodigoEmpresa) LanzarError('Empresa es requerida', 400);
 
         const Inventario = await InventarioRelacion.findAll({
-            where: { 
-                CodigoEmpresa, 
+            where: {
+                CodigoEmpresa,
                 Estatus: 3 // ✅ solo cambia esto
             },
             attributes: ['CodigoInventario', 'PrecioVenta'],
@@ -729,7 +767,7 @@ const ListadoNombreTela = async (CodigoTipoTela) => {
             LanzarError('CodigoTipoTela es requerido', 400);
 
         const telas = await TelaModelo.findAll({
-            where: { 
+            where: {
                 Estatus: 1,
                 CodigoTipoTela: CodigoTipoTela
             },
@@ -761,7 +799,7 @@ const ListadoNombreTela = async (CodigoTipoTela) => {
 const CrearTipoTela = async (data) => {
     try {
 
-        const { NombreTipoTela } = data;
+        const NombreTipoTela = NormalizarNombre(data.NombreTipoTela);
 
         if (!NombreTipoTela) {
             LanzarError('El nombre del tipo de tela es requerido', 400, 'Validacion');
@@ -797,7 +835,8 @@ const CrearTipoTela = async (data) => {
 const CrearTela = async (data) => {
     try {
 
-        const { CodigoTipoTela, NombreTela } = data;
+        const CodigoTipoTela = data.CodigoTipoTela;
+        const NombreTela = NormalizarNombre(data.NombreTela);
 
         if (!CodigoTipoTela || !NombreTela) {
             LanzarError('Tipo de tela y nombre de tela son requeridos', 400, 'Validacion');

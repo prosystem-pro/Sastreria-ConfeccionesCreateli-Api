@@ -331,7 +331,10 @@ const Obtener = async (req, res) => {
 const ListadoTipoProducto = async (req, res) => {
   try {
 
-    const Objeto = await Servicio.ListadoTipoProducto();
+
+    const { NombreRol } = req.Datos;
+
+    const Objeto = await Servicio.ListadoTipoProducto(NombreRol);
 
     return ResponderExito(
       res,
