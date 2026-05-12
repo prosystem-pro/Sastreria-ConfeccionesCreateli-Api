@@ -233,36 +233,36 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
         // VALIDAR PRODUCTO DUPLICADO
         // =========================
         const NombreProductoLimpio = NormalizarNombre(NombreProducto);
-  // 1. Buscar producto por nombre
-const ProductoExistente = await ProductoModelo.findOne({
-    where: {
-        NombreProducto: NombreProductoLimpio,
-        CodigoEmpresa
-    },
-    transaction: Transaccion
-});
+        // 1. Buscar producto por nombre
+        const ProductoExistente = await ProductoModelo.findOne({
+            where: {
+                NombreProducto: NombreProductoLimpio,
+                CodigoEmpresa
+            },
+            transaction: Transaccion
+        });
 
-if (ProductoExistente) {
+        if (ProductoExistente) {
 
-    // 2. Buscar inventario de ese producto
-    const InventarioExistente = await InventarioModelo.findOne({
-        where: {
-            CodigoProducto: ProductoExistente.CodigoProducto
-        },
-        transaction: Transaccion
-    });
+            // 2. Buscar inventario de ese producto
+            const InventarioExistente = await InventarioModelo.findOne({
+                where: {
+                    CodigoProducto: ProductoExistente.CodigoProducto
+                },
+                transaction: Transaccion
+            });
 
-    if (InventarioExistente) {
+            if (InventarioExistente) {
 
-        if (InventarioExistente.Estatus === 1) {
-            LanzarError('El producto ya existe', 400);
+                if (InventarioExistente.Estatus === 1) {
+                    LanzarError('El producto ya existe', 400);
+                }
+
+                if (InventarioExistente.Estatus === 3) {
+                    LanzarError('El producto ya existe en productos eliminados. Debe restaurarlo.', 400);
+                }
+            }
         }
-
-        if (InventarioExistente.Estatus === 3) {
-            LanzarError('El producto ya existe en productos eliminados. Debe restaurarlo.', 400);
-        }
-    }
-}
 
         // =========================
         // 1. CREAR PRODUCTO
@@ -737,8 +737,7 @@ const ListadoProducto = async () => {
         }));
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al obtener productos', 500, 'Error');
+        throw error;
     }
 };
 const ListadoTipoTela = async () => {
@@ -755,8 +754,7 @@ const ListadoTipoTela = async () => {
         }));
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al obtener tipos de tela', 500, 'Error');
+        throw error;
     }
 };
 
@@ -785,13 +783,7 @@ const ListadoNombreTela = async (CodigoTipoTela) => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError(
-            'Error al obtener nombres de tela',
-            500,
-            'Error'
-        );
+        throw error;
     }
 };
 
@@ -802,7 +794,7 @@ const CrearTipoTela = async (data) => {
         const NombreTipoTela = NormalizarNombre(data.NombreTipoTela);
 
         if (!NombreTipoTela) {
-            LanzarError('El nombre del tipo de tela es requerido', 400, 'Validacion');
+            LanzarError('El nombre del tipo de tela es requerido', 400, 'Alerta');
         }
 
         const existe = await TipoTelaModelo.findOne({
@@ -813,7 +805,7 @@ const CrearTipoTela = async (data) => {
         });
 
         if (existe) {
-            LanzarError('El tipo de tela ya existe', 400, 'Validacion');
+            LanzarError('El tipo de tela ya existe', 400, 'Alerta');
         }
 
         const nuevo = await TipoTelaModelo.create({
@@ -827,8 +819,7 @@ const CrearTipoTela = async (data) => {
         };
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al crear tipo de tela', 500, 'Error');
+        throw error;
     }
 };
 
@@ -839,13 +830,13 @@ const CrearTela = async (data) => {
         const NombreTela = NormalizarNombre(data.NombreTela);
 
         if (!CodigoTipoTela || !NombreTela) {
-            LanzarError('Tipo de tela y nombre de tela son requeridos', 400, 'Validacion');
+            LanzarError('Tipo de tela y nombre de tela son requeridos', 400, 'Alerta');
         }
 
         const tipoTela = await TipoTelaModelo.findByPk(CodigoTipoTela);
 
         if (!tipoTela) {
-            LanzarError('El tipo de tela no existe', 400, 'Validacion');
+            LanzarError('El tipo de tela no existe', 400, 'Alerta');
         }
 
         const existe = await TelaModelo.findOne({
@@ -856,7 +847,7 @@ const CrearTela = async (data) => {
         });
 
         if (existe) {
-            LanzarError('La tela ya existe', 400, 'Validacion');
+            LanzarError('La tela ya existe', 400, 'Alerta');
         }
 
         const nueva = await TelaModelo.create({
@@ -872,8 +863,7 @@ const CrearTela = async (data) => {
         };
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al crear tela', 500, 'Error');
+        throw error;
     }
 };
 // OBTENER POR CODIGO
@@ -889,14 +879,13 @@ const ObtenerTipoTelaPorCodigo = async (codigo) => {
         });
 
         if (!tipo) {
-            LanzarError('Tipo de tela no encontrado', 404, 'Validacion');
+            LanzarError('Tipo de tela no encontrado', 404, 'Alerta');
         }
 
         return tipo;
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al obtener tipo de tela', 500, 'Error');
+        throw error;
     }
 };
 const ObtenerTelaPorCodigo = async (codigo) => {
@@ -921,14 +910,13 @@ const ObtenerTelaPorCodigo = async (codigo) => {
         });
 
         if (!tela) {
-            LanzarError('Tela no encontrada', 404, 'Validacion');
+            LanzarError('Tela no encontrada', 404, 'Alerta');
         }
 
         return tela;
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al obtener tela', 500, 'Error');
+        throw error;
     }
 };
 
@@ -941,7 +929,7 @@ const EditarTipoTela = async (codigo, data) => {
         const tipo = await TipoTelaModelo.findByPk(codigo);
 
         if (!tipo) {
-            LanzarError('Tipo de tela no encontrado', 404, 'Validacion');
+            LanzarError('Tipo de tela no encontrado', 404, 'Alerta');
         }
 
         const existe = await TipoTelaModelo.findOne({
@@ -952,7 +940,7 @@ const EditarTipoTela = async (codigo, data) => {
         });
 
         if (existe) {
-            LanzarError('Ya existe un tipo de tela con ese nombre', 400, 'Validacion');
+            LanzarError('Ya existe un tipo de tela con ese nombre', 400, 'Alerta');
         }
 
         await tipo.update({
@@ -965,8 +953,7 @@ const EditarTipoTela = async (codigo, data) => {
         };
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al editar tipo de tela', 500, 'Error');
+        throw error;
     }
 };
 
@@ -978,14 +965,14 @@ const EditarTela = async (codigo, data) => {
         const tela = await TelaModelo.findByPk(codigo);
 
         if (!tela) {
-            LanzarError('Tela no encontrada', 404, 'Validacion');
+            LanzarError('Tela no encontrada', 404, 'Alerta');
         }
 
         if (CodigoTipoTela) {
             const tipoTela = await TipoTelaModelo.findByPk(CodigoTipoTela);
 
             if (!tipoTela) {
-                LanzarError('El tipo de tela no existe', 400, 'Validacion');
+                LanzarError('El tipo de tela no existe', 400, 'Alerta');
             }
         }
 
@@ -998,7 +985,7 @@ const EditarTela = async (codigo, data) => {
             });
 
             if (existe) {
-                LanzarError('Ya existe una tela con ese nombre', 400, 'Validacion');
+                LanzarError('Ya existe una tela con ese nombre', 400, 'Alerta');
             }
         }
 
@@ -1015,7 +1002,7 @@ const EditarTela = async (codigo, data) => {
 
     } catch (error) {
         console.error(error);
-        LanzarError('Error al editar tela', 500, 'Error');
+        throw error;
     }
 };
 // ELIMINAR
@@ -1029,7 +1016,7 @@ const EliminarTipoTela = async (codigo) => {
         });
 
         if (!tipo) {
-            LanzarError('Tipo de tela no encontrado', 404, 'Validacion');
+            LanzarError('Tipo de tela no encontrado', 404, 'Alerta');
         }
 
         // eliminación física
@@ -1044,8 +1031,7 @@ const EliminarTipoTela = async (codigo) => {
         };
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al eliminar tipo de tela', 500, 'Error');
+        throw error;
     }
 };
 
@@ -1060,7 +1046,7 @@ const EliminarTela = async (codigo) => {
         });
 
         if (!tela) {
-            LanzarError('Tela no encontrada', 404, 'Validacion');
+            LanzarError('Tela no encontrada', 404, 'Alerta');
         }
 
         await tela.update({
@@ -1073,13 +1059,7 @@ const EliminarTela = async (codigo) => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError(
-            'Error al eliminar tela',
-            500,
-            'Error'
-        );
+        throw error;
     }
 };
 module.exports = {
