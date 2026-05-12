@@ -34,7 +34,6 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa, NombreRol) => {
     const transaccion = await BaseDatos.transaction();
 
     try {
-
         if (!CodigoEmpresa)
             LanzarError('La empresa es obligatoria', 400, 'Alerta');
 
@@ -437,11 +436,26 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
                     'Advertencia'
                 );
             // ================= EMPRESA_ASOCIADA =================
-            const NombreTelaAleatorio =
-                NombreRol === 'EMPRESA_ASOCIADA'
-                    ? producto.NombreTela || null
-                    : null;
+            let NombreTelaAleatorio = null;
 
+            // ================= EMPRESA_ASOCIADA =================
+            if (NombreRol === 'EMPRESA_ASOCIADA') {
+
+                NombreTelaAleatorio =
+                    producto.NombreTela || null;
+
+            }
+            // ================= EMPRESA_OFICIAL =================
+            else {
+
+                // conservar el valor original
+                const detalleAnterior = detallesAnteriores.find(
+                    d => d.CodigoInventario === inventario.CodigoInventario
+                );
+
+                NombreTelaAleatorio =
+                    detalleAnterior?.NombreTelaAleatorio || null;
+            }
             const detalle = await PedidoDetalleModelo.create({
 
                 CodigoPedido: pedido.CodigoPedido,
@@ -1289,7 +1303,7 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         throw error;
     }
 };
-
+//aqui estamos
 const ObtenerPedido = async (CodigoPedido) => {
     try {
 
