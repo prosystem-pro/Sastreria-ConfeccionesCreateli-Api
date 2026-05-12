@@ -284,11 +284,18 @@ const ListadoEntregados = async (req, res) => {
 
     const verOtros = req.query.verOtros === 'true';
 
+    const {
+      FechaInicio,
+      FechaFin
+    } = req.query;
+
     const Objeto = await Servicio.ListadoEntregados(
       CodigoEmpresa,
       SuperAdmin,
       NombreEmpresa,
-      verOtros
+      verOtros,
+      FechaInicio,
+      FechaFin
     );
 
     return ResponderExito(

@@ -6,7 +6,7 @@ const path = require('path');
 const { UTCAGuatemala_FechaHora,
     FormatoFecha,
     GuatemalaAUTC,
-    FormatoFechaDesdeDateTime } = require('../Utilidades/ConversionFechas');
+    FormatoFechaDesdeDateTime, RangoGuatemalaAUTC } = require('../Utilidades/ConversionFechas');
 
 
 const { PedidoModelo, ClienteModelo, EstadoPedidoModelo, UsuarioModelo,
@@ -362,20 +362,20 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
 
             await det.destroy({ transaction: transaccion });
         }
-const convertirFecha = (fecha) => {
+        const convertirFecha = (fecha) => {
 
-    if (!fecha) return null;
+            if (!fecha) return null;
 
-    // Ya viene correcta: yyyy-MM-dd
-    if (fecha.includes('-')) {
-        return fecha;
-    }
+            // Ya viene correcta: yyyy-MM-dd
+            if (fecha.includes('-')) {
+                return fecha;
+            }
 
-    // Viene dd/MM/yyyy
-    const [dia, mes, anio] = fecha.split('/');
+            // Viene dd/MM/yyyy
+            const [dia, mes, anio] = fecha.split('/');
 
-    return `${anio}-${mes}-${dia}`;
-};
+            return `${anio}-${mes}-${dia}`;
+        };
         // ===================== ACTUALIZAR ENCABEZADO =====================
         const datosActualizar = {
 
@@ -1141,9 +1141,6 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         if (Number(datos.MontoPago) <= 0)
             LanzarError('El monto debe ser mayor a cero', 400, 'Alerta');
 
-        if (!Number.isInteger(Number(datos.MontoPago)))
-            LanzarError('El monto debe ser un número entero', 400, 'Alerta');
-
         if (!datos.FormaPago)
             LanzarError('La forma de pago es obligatoria', 400, 'Alerta');
 
@@ -1158,7 +1155,7 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         });
 
         if (!formaPago)
-            LanzarError('La forma de pago no existe', 404, 'Advertencia');
+            LanzarError('La forma de pago no existe', 404, 'Alerta');
 
         // ================= REGLA DE NEGOCIO =================
         const requiereReferencia =
@@ -1186,7 +1183,7 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         });
 
         if (!pedido)
-            LanzarError('El pedido no existe', 404, 'Advertencia');
+            LanzarError('El pedido no existe', 404, 'Alerta');
 
         // ================= PAGOS ACTUALES =================
         const pagos = await PagoAplicacionModelo.findAll({
@@ -1206,10 +1203,10 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         const saldoAnterior = Number(pedido.Total) - totalPagado;
 
         if (saldoAnterior <= 0)
-            LanzarError('El pedido ya está pagado', 400, 'Advertencia');
+            LanzarError('El pedido ya está pagado', 400, 'Alerta');
 
         if (datos.MontoPago > saldoAnterior)
-            LanzarError('El monto excede el saldo pendiente', 400, 'Advertencia');
+            LanzarError('El monto excede el saldo pendiente', 400, 'Alerta');
 
         const saldoPendiente = saldoAnterior - Number(datos.MontoPago);
 
@@ -1740,12 +1737,38 @@ const ListarPagosPorPedido = async (codigoPedido) => {
     }
 
 };
-const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false) => {
+const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false, FechaInicio,
+    FechaFin) => {
     try {
 
         let where = {
             Estatus: { [Op.in]: [1, 2, 3, 4] }
         };
+
+        // ================= NUEVA LOGICA FECHAS =================
+        if (
+            FechaInicio &&
+            FechaFin &&
+            FechaInicio !== 'undefined' &&
+            FechaFin !== 'undefined'
+        ) {
+
+            // 🔥 GUATEMALA → UTC
+            const {
+                inicioUTC,
+                finUTC
+            } = RangoGuatemalaAUTC(
+                FechaInicio,
+                FechaFin
+            );
+
+            where.FechaCreacion = {
+                [Op.between]: [
+                    inicioUTC,
+                    finUTC
+                ]
+            };
+        }
 
         if (!SuperAdmin) {
 
@@ -1837,9 +1860,7 @@ const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOt
 
     } catch (error) {
 
-        if (error.statusCode) throw error;
-
-        LanzarError('Error al obtener pedidos entregados', 500);
+        throw error;
     }
 };
 
