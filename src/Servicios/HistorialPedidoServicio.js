@@ -362,12 +362,20 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
 
             await det.destroy({ transaction: transaccion });
         }
-        const convertirFecha = (fecha) => {
-            if (!fecha) return null;
+const convertirFecha = (fecha) => {
 
-            const [dia, mes, anio] = fecha.split('/');
-            return `${anio}-${mes}-${dia}`;
-        };
+    if (!fecha) return null;
+
+    // Ya viene correcta: yyyy-MM-dd
+    if (fecha.includes('-')) {
+        return fecha;
+    }
+
+    // Viene dd/MM/yyyy
+    const [dia, mes, anio] = fecha.split('/');
+
+    return `${anio}-${mes}-${dia}`;
+};
         // ===================== ACTUALIZAR ENCABEZADO =====================
         const datosActualizar = {
 
@@ -493,7 +501,7 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
 
             if (esFisico) {
                 await inventario.update({
-                    StockActual: inventario.StockActual + det.Cantidad
+                    StockActual: inventario.StockActual - producto.Cantidad
                 }, { transaction: transaccion });
             }
         }
