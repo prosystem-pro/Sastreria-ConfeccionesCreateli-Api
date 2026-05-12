@@ -1864,7 +1864,8 @@ const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOt
     }
 };
 
-const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false) => {
+const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false, FechaInicio,
+    FechaFin,) => {
     try {
         let where = {
             Estatus: { [Op.in]: [1, 2, 3, 4] }
@@ -1881,6 +1882,30 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = fals
                 // 🔹 NORMAL (como siempre)
                 where.CodigoEmpresa = CodigoEmpresa;
             }
+        }
+        // ================= FILTRO FECHAS =================
+        if (
+            FechaInicio &&
+            FechaFin &&
+            FechaInicio !== 'undefined' &&
+            FechaFin !== 'undefined'
+        ) {
+
+            // 🔥 GUATEMALA → UTC
+            const {
+                inicioUTC,
+                finUTC
+            } = RangoGuatemalaAUTC(
+                FechaInicio,
+                FechaFin
+            );
+
+            where.FechaCreacion = {
+                [Op.between]: [
+                    inicioUTC,
+                    finUTC
+                ]
+            };
         }
 
         const pedidos = await PedidoModelo.findAll({
