@@ -187,7 +187,7 @@ const NormalizarNombre = (texto) => {
     return texto
         .trim()
         .replace(/\s+/g, ' ')
-        .replace(/[^a-zA-Z\s]/g, '')
+        .replace(/[^a-zA-Z0-9\s]/g, '')
         .toLowerCase()
         .replace(/\b\w/g, c => c.toUpperCase());
 };

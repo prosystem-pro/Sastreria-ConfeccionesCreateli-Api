@@ -1704,99 +1704,70 @@ const EliminarPedido = async (CodigoPedido) => {
 
             if (inventario) {
 
-                // =========================================================
-                // 🔥 OBTENER TIPO PRODUCTO (CADENA CORRECTA DE CONSULTA)
-                // Inventario → Producto → TipoProducto → Nombre
-                // =========================================================
+                const inventario = await InventarioModelo.findOne({
+                    where: {
+                        CodigoInventario: detalle.CodigoInventario
+                    },
+                    transaction: transaccion,
+                    lock: transaccion.LOCK.UPDATE
+                });
 
-console.log('==============================');
-console.log('INICIO ITERACIÓN DETALLE');
-console.log('CodigoInventario:', detalle.CodigoInventario);
-console.log('Cantidad:', detalle.Cantidad);
-
-const inventario = await InventarioModelo.findOne({
-    where: {
-        CodigoInventario: detalle.CodigoInventario
-    },
-    transaction: transaccion,
-    lock: transaccion.LOCK.UPDATE
-});
-
-console.log('Inventario encontrado:', !!inventario);
-
-if (!inventario) {
-    console.log('❌ NO HAY INVENTARIO');
-    continue;
-}
-
-console.log('CodigoProducto desde Inventario:', inventario.CodigoProducto);
-
-// ================= PRODUCTO =================
-let producto = null;
-
-try {
-    producto = await ProductoModelo.findOne({
-        where: {
-            CodigoProducto: inventario.CodigoProducto
-        },
-        transaction: transaccion
-    });
-
-    console.log('Producto encontrado:', !!producto);
-
-} catch (err) {
-    console.log('💥 ERROR EN PRODUCTO FINDONE');
-    console.log(err);
-    throw err;
-}
-
-console.log('Producto raw:', producto);
-
-// ================= TIPO PRODUCTO =================
-let tipoProductoNombre = null;
-
-if (producto) {
-    console.log('CodigoTipoProducto:', producto.CodigoTipoProducto);
-
-    if (producto.CodigoTipoProducto) {
-
-        const tipoProducto = await TipoProductoModelo.findOne({
-            where: {
-                CodigoTipoProducto: producto.CodigoTipoProducto
-            },
-            transaction: transaccion
-        });
-
-        tipoProductoNombre = tipoProducto?.NombreTipoProducto || null;
-
-        console.log('TipoProducto encontrado:', tipoProductoNombre);
-    }
-}
-
-console.log('TipoProducto FINAL:', tipoProductoNombre);
-
-// ================= DECISIÓN =================
-const esFisico = tipoProductoNombre?.toUpperCase() === 'FISICO';
-const esConfeccion = tipoProductoNombre?.toUpperCase() === 'CONFECCION';
-
-console.log('esFisico:', esFisico);
-console.log('esConfeccion:', esConfeccion);
-
-if (!esFisico && !esConfeccion) {
-    console.log('💥 ENTRÓ EN ERROR DE TIPO');
-    LanzarError(
-        `Tipo de producto inválido en detalle: ${tipoProductoNombre}`,
-        400,
-        'Error'
-    );
-}
-
-console.log('FIN ITERACIÓN DETALLE');
-console.log('==============================');
+                if (!inventario) {
+                    continue;
+                }
 
 
+                // ================= PRODUCTO =================
+                let producto = null;
+
+                try {
+                    producto = await ProductoModelo.findOne({
+                        where: {
+                            CodigoProducto: inventario.CodigoProducto
+                        },
+                        transaction: transaccion
+                    });
 
 
+                } catch (err) {
+                    console.log(err);
+                    throw err;
+                }
+
+
+                // ================= TIPO PRODUCTO =================
+                let tipoProductoNombre = null;
+
+                if (producto) {
+
+                    if (producto.CodigoTipoProducto) {
+
+                        const tipoProducto = await TipoProductoModelo.findOne({
+                            where: {
+                                CodigoTipoProducto: producto.CodigoTipoProducto
+                            },
+                            transaction: transaccion
+                        });
+
+                        tipoProductoNombre = tipoProducto?.NombreTipoProducto || null;
+
+                        console.log('TipoProducto encontrado:', tipoProductoNombre);
+                    }
+                }
+
+
+                // ================= DECISIÓN =================
+                const esFisico = tipoProductoNombre?.toUpperCase() === 'FISICO';
+                const esConfeccion = tipoProductoNombre?.toUpperCase() === 'CONFECCION';
+
+
+                if (!esFisico && !esConfeccion) {
+                    LanzarError(
+                        `Tipo de producto inválido en detalle: ${tipoProductoNombre}`,
+                        400,
+                        'Error'
+                    );
+                }
 
                 // =========================================================
                 // ✔ SOLO FISICO REGRESA STOCK
@@ -1835,10 +1806,6 @@ console.log('==============================');
 
                     }, { transaction: transaccion });
                 }
-
-                // =========================================================
-                // ❌ CONFECCION: NO HACE NADA DE INVENTARIO
-                // =========================================================
             }
 
             // ================= MEDIDAS =================
