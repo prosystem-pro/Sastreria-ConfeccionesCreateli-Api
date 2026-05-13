@@ -1540,6 +1540,133 @@ const ObtenerPedido = async (CodigoPedido) => {
         throw error;
     }
 };
+// const EliminarPedido = async (CodigoPedido) => {
+
+//     const transaccion = await BaseDatos.transaction();
+
+//     try {
+
+//         if (!CodigoPedido)
+//             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+
+//         const pedido = await PedidoModelo.findOne({
+//             where: { CodigoPedido },
+//             transaction: transaccion
+//         });
+
+//         if (!pedido)
+//             LanzarError('El pedido no existe', 404, 'Advertencia');
+
+//         const detalles = await PedidoDetalleModelo.findAll({
+//             where: { CodigoPedido },
+//             transaction: transaccion
+//         });
+
+//         for (const detalle of detalles) {
+
+//             const inventario = await InventarioModelo.findOne({
+//                 where: {
+//                     CodigoInventario: detalle.CodigoInventario
+//                 },
+//                 transaction: transaccion,
+//                 lock: true
+//             });
+
+//             if (inventario) {
+
+//                 const stockAnterior = inventario.StockActual;
+//                 const stockNuevo = stockAnterior + detalle.Cantidad;
+
+//                 await inventario.update({
+//                     StockActual: stockNuevo
+//                 }, { transaction: transaccion });
+
+//                 // ================= MOVIMIENTO INVENTARIO =================
+//                 await MovimientoInventarioModelo.create({
+
+//                     CodigoEmpresa: 1,
+//                     CodigoInventario: inventario.CodigoInventario,
+//                     CodigoUsuario: pedido.CodigoUsuario,
+
+//                     TipoMovimiento: 'ENTRADA',
+//                     OrigenMovimiento: 'ELIMINACION_PEDIDO',
+
+//                     TipoDocumento: 'PEDIDO',
+//                     CodigoDocumento: CodigoPedido,
+
+//                     Cantidad: detalle.Cantidad,
+
+//                     StockAnterior: stockAnterior,
+//                     StockNuevo: stockNuevo,
+
+//                     FechaMovimiento: new Date(),
+//                     Observacion: `Entrada por eliminación pedido ${CodigoPedido}`,
+
+//                     Estatus: 1,
+//                     FechaCreacion: new Date()
+
+//                 }, { transaction: transaccion });
+//             }
+
+//             await PedidoDetalleMedidaModelo.destroy({
+//                 where: {
+//                     CodigoPedidoDetalle: detalle.CodigoPedidoDetalle
+//                 },
+//                 transaction: transaccion
+//             });
+
+//             await detalle.destroy({
+//                 transaction: transaccion
+//             });
+//         }
+
+//         // ================= PAGOS =================
+//         const pagosAplicados = await PagoAplicacionModelo.findAll({
+//             where: {
+//                 TipoDocumento: 'PEDIDO',
+//                 CodigoDocumento: CodigoPedido
+//             },
+//             transaction: transaccion
+//         });
+
+//         for (const pagoAplicacion of pagosAplicados) {
+
+//             await pagoAplicacion.destroy({
+//                 transaction: transaccion
+//             });
+
+//             await PagoModelo.destroy({
+//                 where: {
+//                     CodigoPago: pagoAplicacion.CodigoPago
+//                 },
+//                 transaction: transaccion
+//             });
+//         }
+
+//         await pedido.destroy({
+//             transaction: transaccion
+//         });
+
+//         await transaccion.commit();
+
+//         return {
+//             CodigoPedido,
+//             TotalDetalles: detalles.length,
+//             TotalPagos: pagosAplicados.length,
+//             Mensaje: 'Pedido eliminado completamente'
+//         };
+
+//     } catch (error) {
+
+//         try {
+//             await transaccion.rollback();
+//         } catch (_) { }
+
+//         console.error(error);
+//         throw error;
+//     }
+// };
+
 const EliminarPedido = async (CodigoPedido) => {
 
     const transaccion = await BaseDatos.transaction();
@@ -1549,6 +1676,7 @@ const EliminarPedido = async (CodigoPedido) => {
         if (!CodigoPedido)
             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
 
+        // ================= PEDIDO =================
         const pedido = await PedidoModelo.findOne({
             where: { CodigoPedido },
             transaction: transaccion
@@ -1557,6 +1685,7 @@ const EliminarPedido = async (CodigoPedido) => {
         if (!pedido)
             LanzarError('El pedido no existe', 404, 'Advertencia');
 
+        // ================= DETALLES =================
         const detalles = await PedidoDetalleModelo.findAll({
             where: { CodigoPedido },
             transaction: transaccion
@@ -1564,50 +1693,155 @@ const EliminarPedido = async (CodigoPedido) => {
 
         for (const detalle of detalles) {
 
+            // ================= INVENTARIO =================
             const inventario = await InventarioModelo.findOne({
                 where: {
                     CodigoInventario: detalle.CodigoInventario
                 },
                 transaction: transaccion,
-                lock: true
+                lock: transaccion.LOCK.UPDATE
             });
 
             if (inventario) {
 
-                const stockAnterior = inventario.StockActual;
-                const stockNuevo = stockAnterior + detalle.Cantidad;
+                // =========================================================
+                // 🔥 OBTENER TIPO PRODUCTO (CADENA CORRECTA DE CONSULTA)
+                // Inventario → Producto → TipoProducto → Nombre
+                // =========================================================
 
-                await inventario.update({
-                    StockActual: stockNuevo
-                }, { transaction: transaccion });
+console.log('==============================');
+console.log('INICIO ITERACIÓN DETALLE');
+console.log('CodigoInventario:', detalle.CodigoInventario);
+console.log('Cantidad:', detalle.Cantidad);
 
-                // ================= MOVIMIENTO INVENTARIO =================
-                await MovimientoInventarioModelo.create({
+const inventario = await InventarioModelo.findOne({
+    where: {
+        CodigoInventario: detalle.CodigoInventario
+    },
+    transaction: transaccion,
+    lock: transaccion.LOCK.UPDATE
+});
 
-                    CodigoEmpresa: 1,
-                    CodigoInventario: inventario.CodigoInventario,
-                    CodigoUsuario: pedido.CodigoUsuario,
+console.log('Inventario encontrado:', !!inventario);
 
-                    TipoMovimiento: 'ENTRADA',
-                    OrigenMovimiento: 'ELIMINACION_PEDIDO',
+if (!inventario) {
+    console.log('❌ NO HAY INVENTARIO');
+    continue;
+}
 
-                    TipoDocumento: 'PEDIDO',
-                    CodigoDocumento: CodigoPedido,
+console.log('CodigoProducto desde Inventario:', inventario.CodigoProducto);
 
-                    Cantidad: detalle.Cantidad,
+// ================= PRODUCTO =================
+let producto = null;
 
-                    StockAnterior: stockAnterior,
-                    StockNuevo: stockNuevo,
+try {
+    producto = await ProductoModelo.findOne({
+        where: {
+            CodigoProducto: inventario.CodigoProducto
+        },
+        transaction: transaccion
+    });
 
-                    FechaMovimiento: new Date(),
-                    Observacion: `Entrada por eliminación pedido ${CodigoPedido}`,
+    console.log('Producto encontrado:', !!producto);
 
-                    Estatus: 1,
-                    FechaCreacion: new Date()
+} catch (err) {
+    console.log('💥 ERROR EN PRODUCTO FINDONE');
+    console.log(err);
+    throw err;
+}
 
-                }, { transaction: transaccion });
+console.log('Producto raw:', producto);
+
+// ================= TIPO PRODUCTO =================
+let tipoProductoNombre = null;
+
+if (producto) {
+    console.log('CodigoTipoProducto:', producto.CodigoTipoProducto);
+
+    if (producto.CodigoTipoProducto) {
+
+        const tipoProducto = await TipoProductoModelo.findOne({
+            where: {
+                CodigoTipoProducto: producto.CodigoTipoProducto
+            },
+            transaction: transaccion
+        });
+
+        tipoProductoNombre = tipoProducto?.NombreTipoProducto || null;
+
+        console.log('TipoProducto encontrado:', tipoProductoNombre);
+    }
+}
+
+console.log('TipoProducto FINAL:', tipoProductoNombre);
+
+// ================= DECISIÓN =================
+const esFisico = tipoProductoNombre?.toUpperCase() === 'FISICO';
+const esConfeccion = tipoProductoNombre?.toUpperCase() === 'CONFECCION';
+
+console.log('esFisico:', esFisico);
+console.log('esConfeccion:', esConfeccion);
+
+if (!esFisico && !esConfeccion) {
+    console.log('💥 ENTRÓ EN ERROR DE TIPO');
+    LanzarError(
+        `Tipo de producto inválido en detalle: ${tipoProductoNombre}`,
+        400,
+        'Error'
+    );
+}
+
+console.log('FIN ITERACIÓN DETALLE');
+console.log('==============================');
+
+
+
+
+
+                // =========================================================
+                // ✔ SOLO FISICO REGRESA STOCK
+                // =========================================================
+                if (esFisico) {
+
+                    const stockAnterior = inventario.StockActual;
+                    const stockNuevo = stockAnterior + detalle.Cantidad;
+
+                    await inventario.update({
+                        StockActual: stockNuevo
+                    }, { transaction: transaccion });
+
+                    await MovimientoInventarioModelo.create({
+
+                        CodigoEmpresa: pedido.CodigoEmpresa || 1,
+                        CodigoInventario: inventario.CodigoInventario,
+                        CodigoUsuario: pedido.CodigoUsuario,
+
+                        TipoMovimiento: 'ENTRADA',
+                        OrigenMovimiento: 'ELIMINACION_PEDIDO',
+
+                        TipoDocumento: 'PEDIDO',
+                        CodigoDocumento: CodigoPedido,
+
+                        Cantidad: detalle.Cantidad,
+
+                        StockAnterior: stockAnterior,
+                        StockNuevo: stockNuevo,
+
+                        FechaMovimiento: new Date(),
+                        Observacion: `Entrada por eliminación pedido ${CodigoPedido}`,
+
+                        Estatus: 1,
+                        FechaCreacion: new Date()
+
+                    }, { transaction: transaccion });
+                }
+
+                // =========================================================
+                // ❌ CONFECCION: NO HACE NADA DE INVENTARIO
+                // =========================================================
             }
 
+            // ================= MEDIDAS =================
             await PedidoDetalleMedidaModelo.destroy({
                 where: {
                     CodigoPedidoDetalle: detalle.CodigoPedidoDetalle
@@ -1643,6 +1877,7 @@ const EliminarPedido = async (CodigoPedido) => {
             });
         }
 
+        // ================= ELIMINAR PEDIDO =================
         await pedido.destroy({
             transaction: transaccion
         });
@@ -1658,9 +1893,9 @@ const EliminarPedido = async (CodigoPedido) => {
 
     } catch (error) {
 
-        try {
+        if (transaccion && !transaccion.finished) {
             await transaccion.rollback();
-        } catch (_) { }
+        }
 
         console.error(error);
         throw error;
