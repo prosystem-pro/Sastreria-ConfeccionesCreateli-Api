@@ -765,11 +765,14 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
         // ================= LOGO =================
         const logoPath = path.join(
             __dirname,
-            '../public/LogoConfeccionesCreateli.png'
+            '../public/LogoConfeccionesCreateliFactura.jpeg'
         );
 
         if (fs.existsSync(logoPath)) {
-            doc.image(logoPath, 470, 40, { width: 70 });
+            doc.image(logoPath, 365, 30, {
+                width: 120,
+                height: 80
+            });
         }
 
 
@@ -844,7 +847,10 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
 
         doc.font('Helvetica-Bold').fontSize(11);
 
-        doc.text('CANTIDAD', 50, y + 5);
+        doc.text('CANTIDAD', 50, y + 5, {
+            width: 80,
+            align: 'center'
+        });
         doc.text('PRODUCTO', 150, y + 5);
         doc.text('TOTAL', 400, y + 5, { width: 140, align: 'right' });
 
@@ -858,7 +864,11 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
             //     .lineTo(550, y)
             //     .stroke();
 
-            doc.text(prod.Cantidad, 50, y + 5);
+
+            doc.text(String(prod.Cantidad), 40, y + 5, {
+                width: 80,
+                align: 'center'
+            });
 
             doc.text(prod.NombreProducto, 150, y + 5, {
                 width: 220
