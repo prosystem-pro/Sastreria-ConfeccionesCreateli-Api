@@ -827,7 +827,7 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
         doc.text(`Celular: ${cliente.Celular || ''}`, 50, inicioY + 85);
 
         doc.text(`Fecha: ${fechaVenta}`, 320, inicioY + 40);
-        doc.text(`Atendido: ${venta.NombreUsuario}`, 320, inicioY + 55);
+        doc.text(`Atendió: ${venta.NombreUsuario}`, 320, inicioY + 55);
         doc.text(`Estado: VENTA`, 320, inicioY + 70);
 
 
