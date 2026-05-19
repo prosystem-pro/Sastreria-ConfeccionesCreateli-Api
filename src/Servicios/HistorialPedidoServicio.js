@@ -283,13 +283,28 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa, NombreRol) => {
             NumeroDocumento: documentoPedido.NumeroDocumento
         };
 
-    } catch (error) {
+    } catch (errorOriginal) {
 
-        if (transaccion && !transaccion.finished) {
-            await transaccion.rollback();
+        console.log('ERROR ORIGINAL:', {
+            message: errorOriginal.message,
+            stack: errorOriginal.stack
+        });
+
+        try {
+
+            if (transaccion && !transaccion.finished) {
+                await transaccion.rollback();
+            }
+
+        } catch (rollbackError) {
+
+            console.log('ERROR EN ROLLBACK:', {
+                message: rollbackError.message,
+                stack: rollbackError.stack
+            });
         }
 
-        throw error;
+        throw errorOriginal;
     }
 };
 const ActualizarPedido = async (datos, usuario, NombreRol) => {

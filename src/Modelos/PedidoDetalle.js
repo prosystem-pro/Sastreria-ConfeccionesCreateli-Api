@@ -88,11 +88,11 @@ module.exports = function(sequelize, DataTypes) {
       allowNull: false
     },
     Codigo: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING(256),
       allowNull: true
     },
     Color: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING(256),
       allowNull: true
     },
     Referencia: {
