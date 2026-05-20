@@ -135,7 +135,7 @@ const Editar = async (codigo, datos, CodigoEmpresa) => {
 
         const nit = datos.NIT && datos.NIT.toString().trim() !== ''
             ? normalizarNIT(datos.NIT)
-            : 'N/A';
+            : 'C/F';
 
         const payload = {
             NombreCliente: nombreNormalizado,
@@ -242,12 +242,12 @@ const QuitarTildes = (texto) => {
         .replace(/[\u0300-\u036f]/g, '');
 };
 const normalizarNIT = (nit) => {
-    if (!nit || nit.toString().trim() === '') return 'N/A';
+    if (!nit || nit.toString().trim() === '') return 'C/F';
 
     const valor = nit.toString().trim();
 
     // Permitir valor especial del sistema
-    if (valor === 'N/A') return 'N/A';
+    if (valor === 'C/F') return 'C/F';
 
     // Solo números y guiones
     if (!/^[\d-]+$/.test(valor)) {
