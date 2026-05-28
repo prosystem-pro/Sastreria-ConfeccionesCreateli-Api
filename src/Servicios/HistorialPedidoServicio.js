@@ -390,12 +390,50 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
 
             return `${anio}-${mes}-${dia}`;
         };
+
+        // ===================== VALIDAR ESTADO PEDIDO =====================
+
+        const estadoPedido = await EstadoPedidoModelo.findOne({
+            where: {
+                CodigoEstadoPedido: datos.CodigoEstadoPedido
+            },
+            transaction: transaccion
+        });
+
+        if (!estadoPedido)
+            LanzarError(
+                'Estado de pedido no válido',
+                400,
+                'Advertencia'
+            );
+
+        const nombreEstado =
+            estadoPedido.NombreEstadoPedido?.toUpperCase();
+
+
+        // ===================== FECHA ENTREGA =====================
+
+        let fechaEntrega = null;
+
+        // SI ES ENTREGADO
+        if (nombreEstado === 'ENTREGADO') {
+
+            // ignorar fecha enviada por frontend
+            fechaEntrega = new Date();
+        }
+        else {
+
+            // usar fecha enviada normalmente
+            fechaEntrega = convertirFecha(datos.FechaEntrega);
+        }
+
+
         // ===================== ACTUALIZAR ENCABEZADO =====================
         const datosActualizar = {
 
             CodigoCliente: datos.CodigoCliente,
             CodigoEstadoPedido: datos.CodigoEstadoPedido,
-            FechaEntrega: convertirFecha(datos.FechaEntrega),
+            FechaEntrega: fechaEntrega,
 
             Subtotal: datos.Subtotal,
             Descuento: datos.Descuento,
