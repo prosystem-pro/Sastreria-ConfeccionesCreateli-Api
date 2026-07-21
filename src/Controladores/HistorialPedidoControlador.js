@@ -158,8 +158,8 @@ const ActualizarPedido = async (req, res) => {
 };
 const EliminarPedido = async (req, res) => {
   try {
-
     const { CodigoPedido } = req.params;
+    const { ClaveEliminacion } = req.body;
 
     if (!CodigoPedido) {
       LanzarError(
@@ -169,8 +169,17 @@ const EliminarPedido = async (req, res) => {
       );
     }
 
+    if (!ClaveEliminacion) {
+      LanzarError(
+        'Debe ingresar la clave de eliminación',
+        400,
+        'Advertencia'
+      );
+    }
+
     const Objeto = await Servicio.EliminarPedido(
-      Number(CodigoPedido)
+      Number(CodigoPedido),
+      ClaveEliminacion
     );
 
     return ResponderExito(

@@ -313,28 +313,28 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
 
     try {
         if (!datos.CodigoPedido)
-            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+            LanzarError('El código de pedido es obligatorio', 400, 'Alerta');
 
         if (!datos.CodigoCliente)
-            LanzarError('El cliente es obligatorio', 400, 'Advertencia');
+            LanzarError('El cliente es obligatorio', 400, 'Alerta');
 
         if (!datos.Productos || datos.Productos.length === 0)
-            LanzarError('El pedido debe tener al menos un producto', 400, 'Advertencia');
+            LanzarError('El pedido debe tener al menos un producto', 400, 'Alerta');
         // ================= VALIDAR DESCUENTO =================
         if (datos.Descuento === null || datos.Descuento === undefined)
-            LanzarError('El descuento es obligatorio', 400, 'Advertencia');
+            LanzarError('El descuento es obligatorio', 400, 'Alerta');
 
         if (typeof datos.Descuento !== 'number' || isNaN(datos.Descuento))
-            LanzarError('El descuento debe ser un número válido', 400, 'Advertencia');
+            LanzarError('El descuento debe ser un número válido', 400, 'Alerta');
 
         if (!Number.isInteger(datos.Descuento))
-            LanzarError('El descuento debe ser un número entero', 400, 'Advertencia');
+            LanzarError('El descuento debe ser un número entero', 400, 'Alerta');
 
         if (datos.Descuento < 0)
-            LanzarError('El descuento no puede ser negativo', 400, 'Advertencia');
+            LanzarError('El descuento no puede ser negativo', 400, 'Alerta');
 
         if (datos.Descuento > 100)
-            LanzarError('El descuento no puede ser mayor a 100', 400, 'Advertencia');
+            LanzarError('El descuento no puede ser mayor a 100', 400, 'Alerta');
 
         // ===================== VALIDAR PEDIDO =====================
         const pedido = await PedidoModelo.findOne({
@@ -346,7 +346,7 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
         });
 
         if (!pedido)
-            LanzarError('Pedido no encontrado', 404, 'Advertencia');
+            LanzarError('Pedido no encontrado', 404, 'Alerta');
 
         // ===================== OBTENER DETALLES ANTERIORES =====================
         const detallesAnteriores = await PedidoDetalleModelo.findAll({
@@ -404,7 +404,7 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
             LanzarError(
                 'Estado de pedido no válido',
                 400,
-                'Advertencia'
+                'Alerta'
             );
 
         const nombreEstado =
@@ -450,22 +450,22 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
         for (const producto of datos.Productos) {
             // ================= VALIDAR CANTIDAD =================
             if (producto.Cantidad === null || producto.Cantidad === undefined)
-                LanzarError('La cantidad es obligatoria', 400, 'Advertencia');
+                LanzarError('La cantidad es obligatoria', 400, 'Alerta');
 
             if (typeof producto.Cantidad !== 'number' || isNaN(producto.Cantidad))
-                LanzarError('La cantidad debe ser un número válido', 400, 'Advertencia');
+                LanzarError('La cantidad debe ser un número válido', 400, 'Alerta');
 
             if (!Number.isInteger(producto.Cantidad))
-                LanzarError('La cantidad debe ser un número entero', 400, 'Advertencia');
+                LanzarError('La cantidad debe ser un número entero', 400, 'Alerta');
 
             if (producto.Cantidad <= 0)
-                LanzarError('La cantidad debe ser mayor a 0', 400, 'Advertencia');
+                LanzarError('La cantidad debe ser mayor a 0', 400, 'Alerta');
             const tipoProducto = producto.NombreTipoProducto?.toUpperCase();
             const esFisico = tipoProducto === 'FISICO';
             const esConfeccion = tipoProducto === 'CONFECCION';
 
             if (!esFisico && !esConfeccion)
-                LanzarError(`Tipo de producto no reconocido: ${tipoProducto}`, 400, 'Advertencia');
+                LanzarError(`Tipo de producto no reconocido: ${tipoProducto}`, 400, 'Alerta');
 
             const inventario = await InventarioModelo.findOne({
                 where: {
@@ -479,14 +479,14 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
                 LanzarError(
                     `No hay inventario para el producto ${producto.CodigoProducto}`,
                     400,
-                    'Advertencia'
+                    'Alerta'
                 );
 
             if (esFisico && inventario.StockActual < producto.Cantidad)
                 LanzarError(
                     `Stock insuficiente para el producto ${producto.CodigoProducto}`,
                     400,
-                    'Advertencia'
+                    'Alerta'
                 );
             // ================= EMPRESA_ASOCIADA =================
             let NombreTelaAleatorio = null;
@@ -593,7 +593,7 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
     try {
 
         if (!CodigoPedido)
-            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+            LanzarError('El código de pedido es obligatorio', 400, 'Alerta');
 
         const aproximarSegunRegla = (valor) => {
             if (!valor || isNaN(valor)) return 0;
@@ -607,7 +607,7 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
         });
 
         if (!empresa)
-            LanzarError('Empresa no encontrada', 404, 'Advertencia');
+            LanzarError('Empresa no encontrada', 404, 'Alerta');
 
 
         // ================= PEDIDO =================
@@ -623,7 +623,7 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
         });
 
         if (!cliente)
-            LanzarError('Cliente no encontrado', 404, 'Advertencia');
+            LanzarError('Cliente no encontrado', 404, 'Alerta');
 
 
         // ================= FORMAS DE PAGO =================
@@ -935,14 +935,14 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
 const GenerarPDFPagoPedido = async (CodigoPago, res) => {
     try {
         if (!CodigoPago)
-            LanzarError('El código de pago es obligatorio', 400, 'Advertencia');
+            LanzarError('El código de pago es obligatorio', 400, 'Alerta');
 
         // ================= EMPRESA =================
         const empresa = await EmpresaModelo.findOne({
             where: { CodigoEmpresa: 1, Estatus: 1 }
         });
         if (!empresa)
-            LanzarError('Empresa no encontrada', 404, 'Advertencia');
+            LanzarError('Empresa no encontrada', 404, 'Alerta');
 
         // ================= PAGO =================
         const pagoAplicacion = await PagoAplicacionModelo.findOne({
@@ -959,22 +959,22 @@ const GenerarPDFPagoPedido = async (CodigoPago, res) => {
             }]
         });
         if (!pagoAplicacion || !pagoAplicacion.FnPago)
-            LanzarError('Pago no encontrado', 404, 'Advertencia');
+            LanzarError('Pago no encontrado', 404, 'Alerta');
         if (Number(pagoAplicacion.FnPago.Estatus) !== 1)
-            LanzarError('El pago está inactivo', 400, 'Advertencia');
+            LanzarError('El pago está inactivo', 400, 'Alerta');
 
         // ================= PEDIDO =================
         const CodigoPedido = pagoAplicacion.CodigoDocumento;
         const pedido = await ObtenerPedido(Number(CodigoPedido));
         if (!pedido)
-            LanzarError('Pedido no encontrado', 404, 'Advertencia');
+            LanzarError('Pedido no encontrado', 404, 'Alerta');
 
         // ================= CLIENTE =================
         const cliente = await ClienteModelo.findOne({
             where: { CodigoCliente: pedido.CodigoCliente, Estatus: 1 }
         });
         if (!cliente)
-            LanzarError('Cliente no encontrado', 404, 'Advertencia');
+            LanzarError('Cliente no encontrado', 404, 'Alerta');
 
         // ================= FORMAS DE PAGO =================
         const formasPagoDB = await FormaPago.findAll({ attributes: ['CodigoFormaPago', 'NombreFormaPago'] });
@@ -1088,7 +1088,7 @@ const ObtenerDatosImpresionPagoPedido = async (CodigoPago) => {
     try {
 
         if (!CodigoPago)
-            LanzarError('El código de pago es obligatorio', 400, 'Advertencia');
+            LanzarError('El código de pago es obligatorio', 400, 'Alerta');
 
         // ================= EMPRESA =================
         const empresa = await EmpresaModelo.findOne({
@@ -1379,7 +1379,7 @@ const ObtenerPedido = async (CodigoPedido) => {
     try {
 
         if (!CodigoPedido)
-            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+            LanzarError('El código de pedido es obligatorio', 400, 'Alerta');
 
         // ===================== PEDIDO =====================
         const pedido = await PedidoModelo.findOne({
@@ -1445,7 +1445,7 @@ const ObtenerPedido = async (CodigoPedido) => {
         });
 
         if (!pedido)
-            LanzarError('Pedido no encontrado', 404, 'Advertencia');
+            LanzarError('Pedido no encontrado', 404, 'Alerta');
 
         // ===================== DETALLES =====================
         const detalles = await PedidoDetalleModelo.findAll({
@@ -1611,15 +1611,19 @@ const ObtenerPedido = async (CodigoPedido) => {
         throw error;
     }
 };
-const EliminarPedido = async (CodigoPedido) => {
+const EliminarPedido = async (CodigoPedido, ClaveEliminacion) => {
 
     const transaccion = await BaseDatos.transaction();
 
     try {
 
         if (!CodigoPedido)
-            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+            LanzarError('El código de pedido es obligatorio', 400, 'Alerta');
 
+        const ClaveCorrecta = process.env.CLAVE_ELIMINACION_GERENTE;
+        if (ClaveEliminacion !== ClaveCorrecta) {
+            LanzarError('Clave de eliminación incorrecta', 403, 'Alerta');
+        }
         // ================= PEDIDO =================
         const pedido = await PedidoModelo.findOne({
             where: { CodigoPedido },
@@ -1627,7 +1631,7 @@ const EliminarPedido = async (CodigoPedido) => {
         });
 
         if (!pedido)
-            LanzarError('El pedido no existe', 404, 'Advertencia');
+            LanzarError('El pedido no existe', 404, 'Alerta');
 
         // ================= DETALLES =================
         const detalles = await PedidoDetalleModelo.findAll({
@@ -1695,7 +1699,7 @@ const EliminarPedido = async (CodigoPedido) => {
 
                         tipoProductoNombre = tipoProducto?.NombreTipoProducto || null;
 
-                        console.log('TipoProducto encontrado:', tipoProductoNombre);
+                      
                     }
                 }
 
@@ -1817,7 +1821,7 @@ const ListarPagosPorPedido = async (codigoPedido) => {
     try {
 
         if (!codigoPedido)
-            LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
+            LanzarError('El código de pedido es obligatorio', 400, 'Alerta');
 
         // 🔎 Obtener pagos aplicados al pedido
         const pagosAplicados = await PagoAplicacionModelo.findAll({
@@ -2200,7 +2204,7 @@ const Obtener = async (codigoPedido) => {
         });
 
         if (!pedido) {
-            LanzarError('Pedido no encontrado', 404, 'Advertencia');
+            LanzarError('Pedido no encontrado', 404, 'Alerta');
         }
 
         const Total = Number(pedido.Total || 0);
@@ -2559,7 +2563,7 @@ const ObtenerProducto = async (codigoProducto, codigoTela = null, codigoTipoTela
     try {
 
         if (!codigoProducto)
-            LanzarError('El código del producto es obligatorio', 400, 'Advertencia');
+            LanzarError('El código del producto es obligatorio', 400, 'Alerta');
 
         const producto = await ProductoModelo.findOne({
             where: { CodigoProducto: codigoProducto },
@@ -2574,12 +2578,12 @@ const ObtenerProducto = async (codigoProducto, codigoTela = null, codigoTipoTela
         });
 
         if (!producto)
-            LanzarError('Producto no encontrado', 404, 'Advertencia');
+            LanzarError('Producto no encontrado', 404, 'Alerta');
 
         const tipoProducto = (producto.TipoProducto?.NombreTipoProducto || '').toUpperCase();
 
         if (!tipoProducto)
-            LanzarError('El tipo de producto no está configurado correctamente', 400, 'Advertencia');
+            LanzarError('El tipo de producto no está configurado correctamente', 400, 'Alerta');
 
         let inventario = null;
 
@@ -2600,7 +2604,7 @@ const ObtenerProducto = async (codigoProducto, codigoTela = null, codigoTipoTela
         else if (tipoProducto === 'CONFECCION') {
 
             if (!codigoTela || !codigoTipoTela)
-                LanzarError('La variación de tela es obligatoria para productos de confección', 400, 'Advertencia');
+                LanzarError('La variación de tela es obligatoria para productos de confección', 400, 'Alerta');
 
             inventario = await InventarioModelo.findOne({
                 where: {
@@ -2613,11 +2617,11 @@ const ObtenerProducto = async (codigoProducto, codigoTela = null, codigoTipoTela
 
         }
         else {
-            LanzarError(`Tipo de producto no válido: ${tipoProducto}`, 400, 'Advertencia');
+            LanzarError(`Tipo de producto no válido: ${tipoProducto}`, 400, 'Alerta');
         }
 
         if (!inventario)
-            LanzarError('No se encontró la variación del producto con precio', 404, 'Advertencia');
+            LanzarError('No se encontró la variación del producto con precio', 404, 'Alerta');
 
         return {
             NombreProducto: producto.NombreProducto,
