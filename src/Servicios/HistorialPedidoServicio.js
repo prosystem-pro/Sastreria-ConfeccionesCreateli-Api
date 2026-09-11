@@ -808,7 +808,7 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
                 prod.NombreProducto,
                 prod.NombreTipoTela,
                 prod.NombreTela
-            ].filter(Boolean).join(' — ');
+            ].filter(Boolean).join(' - ');
 
             const anchoUtil = anchoColumnaProducto - 10;
             const altoTexto = doc.heightOfString(textoProducto, {
