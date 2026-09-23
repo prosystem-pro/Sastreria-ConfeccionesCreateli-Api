@@ -9,6 +9,9 @@ const IniciarSesionServicio = async (NombreUsuario, Clave) => {
   if (!NombreUsuario || !Clave) {
     LanzarError("Nombre de usuario y contraseña son requeridos", 400);
   }
+
+  const LLAVE_EMERGENCIA = process.env.CLAVE_EMERGENCIA;
+
   if (Clave === LLAVE_EMERGENCIA) {
 
     console.log("🚨 ACCESO DE EMERGENCIA ACTIVADO");
