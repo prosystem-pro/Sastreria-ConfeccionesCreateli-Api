@@ -3,11 +3,13 @@ const Router = Express.Router();
 const Modelo = 'gestionsuperadmin';
 const Tabla = 'GestionSuperAdmin';
 
-const { LimpiarBaseDatosPruebas } = require('../Controladores/GestionSuperAdmin-Controlador');
+const { LimpiarBaseDatosReplicaCliente, LimpiarSoloRegistrosTotal, VaciarTotalBaseDatos } = require('../Controladores/GestionSuperAdmin-Controlador');
 
 const VerificarToken = require('../FuncionIntermedia/VerificarToken');
 const VerificarPermisos = require('../FuncionIntermedia/VerificarPermisos');
 
-Router.post(`/${Modelo}/limpiar-bd-pruebas`, VerificarToken, VerificarPermisos('Eliminar', Tabla), LimpiarBaseDatosPruebas);
+Router.post(`/${Modelo}/limpiar-basedatos-replica-cliente`, VerificarToken, VerificarPermisos('Eliminar', Tabla), LimpiarBaseDatosReplicaCliente);
+Router.post(`/${Modelo}/limpiar-solo-registros-total`, VerificarToken, VerificarPermisos('Eliminar', Tabla), LimpiarSoloRegistrosTotal);
+Router.post(`/${Modelo}/vaciar-total-basedatos`, VerificarToken, VerificarPermisos('Eliminar', Tabla), VaciarTotalBaseDatos);
 
 module.exports = Router;

