@@ -2069,48 +2069,162 @@ const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOt
     }
 };
 
+
+
+
+// const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false, FechaInicio,
+//     FechaFin,) => {
+//     try {
+
+//         let where = {
+//             Estatus: { [Op.in]: [1, 2, 3, 4] }
+//         };
+
+//         if (!SuperAdmin) {
+
+//             if (verOtros) {
+//                 // 🔥 TRAE TODAS MENOS LA MÍA
+//                 where.CodigoEmpresa = {
+//                     [Op.ne]: CodigoEmpresa
+//                 };
+//             } else {
+//                 // 🔹 NORMAL (como siempre)
+//                 where.CodigoEmpresa = CodigoEmpresa;
+//             }
+//         }
+//         // ================= FILTRO FECHAS =================
+//         if (
+//             FechaInicio &&
+//             FechaFin &&
+//             FechaInicio !== 'undefined' &&
+//             FechaFin !== 'undefined'
+//         ) {
+
+//             // 🔥 GUATEMALA → UTC
+//             const {
+//                 inicioUTC,
+//                 finUTC
+//             } = RangoGuatemalaAUTC(
+//                 FechaInicio,
+//                 FechaFin
+//             );
+
+//             where.FechaCreacion = {
+//                 [Op.between]: [
+//                     inicioUTC,
+//                     finUTC
+//                 ]
+//             };
+//         }
+
+//         const pedidos = await PedidoModelo.findAll({
+//             where,
+//             attributes: [
+//                 'CodigoPedido',
+//                 'CodigoEmpresa',
+//                 'FechaCreacion',
+//                 'FechaEntrega',
+//                 'Subtotal',
+//                 'Descuento',
+//                 'Total'
+//             ],
+//             include: [
+//                 {
+//                     model: ClienteModelo,
+//                     as: 'CaCliente',
+//                     attributes: ['NombreCliente']
+//                 },
+//                 {
+//                     model: EstadoPedidoModelo,
+//                     as: 'CaEstadoPedido',
+//                     attributes: ['CodigoEstadoPedido', 'NombreEstadoPedido'],
+//                     where: {
+//                         NombreEstadoPedido: {
+//                             [Op.notIn]: ['ENTREGADO', 'VENDIDO']
+//                         }
+//                     }
+//                 },
+//                 {
+//                     model: UsuarioModelo,
+//                     as: 'AdUsuario',
+//                     attributes: ['NombreUsuario']
+//                 },
+//                 // ===================== NUEVO INCLUDE =====================
+//                 {
+//                     model: EmpresaModelo,
+//                     as: 'AdEmpresa',
+//                     attributes: ['NombreEmpresa']
+//                 }
+//             ],
+
+//             order: [['FechaCreacion', 'DESC']]
+//         });
+
+//         const resultado = [];
+
+//         for (const p of pedidos) {
+
+//             const Total = Number(p.Total || 0);
+
+//             const pagos = await PagoAplicacionModelo.findAll({
+//                 where: {
+//                     TipoDocumento: 'PEDIDO',
+//                     CodigoDocumento: p.CodigoPedido
+//                 },
+//                 attributes: ['MontoAplicado']
+//             });
+
+//             const TotalPagado = pagos.reduce(
+//                 (sum, pago) => sum + Number(pago.MontoAplicado),
+//                 0
+//             );
+
+//             const SaldoPendiente = Total - TotalPagado;
+
+//             resultado.push({
+//                 CodigoPedido: p.CodigoPedido,
+//                 CodigoEmpresa: p.CodigoEmpresa,
+//                 NombreEmpresa: verOtros
+//                     ? (p.AdEmpresa?.NombreEmpresa || 'Sin empresa')
+//                     : NombreEmpresa,
+//                 NombreCliente: p.CaCliente?.NombreCliente || 'Sin cliente',
+//                 FechaCreacion: UTCAGuatemala_FechaHora(p.FechaCreacion),
+//                 FechaEntrega: FormatoFecha(p.FechaEntrega),
+//                 Subtotal: p.Subtotal,
+//                 Descuento: p.Descuento,
+//                 Total: Total,
+//                 NombreEstatus: p.CaEstadoPedido?.NombreEstadoPedido || 'Sin estado',
+//                 Estatus: p.CaEstadoPedido?.CodigoEstadoPedido || 0,
+//                 Usuario: p.AdUsuario?.NombreUsuario || 'Sin usuario',
+//                 TotalPagado: TotalPagado,
+//                 SaldoPendiente: SaldoPendiente < 0 ? 0 : SaldoPendiente
+//             });
+//         }
+
+//         return resultado;
+
+//     } catch (error) {
+
+//         if (error.statusCode) throw error;
+
+//         LanzarError('Error al obtener listado de pedidos', 500);
+//     }
+// };
+
 const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false, FechaInicio,
     FechaFin,) => {
     try {
         let where = {
             Estatus: { [Op.in]: [1, 2, 3, 4] }
         };
-
         if (!SuperAdmin) {
-
             if (verOtros) {
-                // 🔥 TRAE TODAS MENOS LA MÍA
                 where.CodigoEmpresa = {
                     [Op.ne]: CodigoEmpresa
                 };
             } else {
-                // 🔹 NORMAL (como siempre)
                 where.CodigoEmpresa = CodigoEmpresa;
             }
-        }
-        // ================= FILTRO FECHAS =================
-        if (
-            FechaInicio &&
-            FechaFin &&
-            FechaInicio !== 'undefined' &&
-            FechaFin !== 'undefined'
-        ) {
-
-            // 🔥 GUATEMALA → UTC
-            const {
-                inicioUTC,
-                finUTC
-            } = RangoGuatemalaAUTC(
-                FechaInicio,
-                FechaFin
-            );
-
-            where.FechaCreacion = {
-                [Op.between]: [
-                    inicioUTC,
-                    finUTC
-                ]
-            };
         }
 
         const pedidos = await PedidoModelo.findAll({
@@ -2145,23 +2259,21 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = fals
                     as: 'AdUsuario',
                     attributes: ['NombreUsuario']
                 },
-                // ===================== NUEVO INCLUDE =====================
                 {
                     model: EmpresaModelo,
                     as: 'AdEmpresa',
                     attributes: ['NombreEmpresa']
                 }
             ],
-
-            order: [['FechaCreacion', 'DESC']]
+            order: [
+                [{ model: EstadoPedidoModelo, as: 'CaEstadoPedido' }, 'CodigoEstadoPedido', 'ASC'],
+                ['FechaEntrega', 'ASC']
+            ]
         });
 
         const resultado = [];
-
         for (const p of pedidos) {
-
             const Total = Number(p.Total || 0);
-
             const pagos = await PagoAplicacionModelo.findAll({
                 where: {
                     TipoDocumento: 'PEDIDO',
@@ -2169,14 +2281,11 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = fals
                 },
                 attributes: ['MontoAplicado']
             });
-
             const TotalPagado = pagos.reduce(
                 (sum, pago) => sum + Number(pago.MontoAplicado),
                 0
             );
-
             const SaldoPendiente = Total - TotalPagado;
-
             resultado.push({
                 CodigoPedido: p.CodigoPedido,
                 CodigoEmpresa: p.CodigoEmpresa,
@@ -2197,15 +2306,23 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = fals
             });
         }
 
+        resultado.sort((a, b) => {
+            if (a.Estatus !== b.Estatus) {
+                return a.Estatus - b.Estatus;
+            }
+            const fechaA = new Date(a.FechaEntrega);
+            const fechaB = new Date(b.FechaEntrega);
+            return fechaA - fechaB;
+        });
+
         return resultado;
-
     } catch (error) {
-
         if (error.statusCode) throw error;
-
         LanzarError('Error al obtener listado de pedidos', 500);
     }
 };
+
+
 const Obtener = async (codigoPedido) => {
     try {
 
