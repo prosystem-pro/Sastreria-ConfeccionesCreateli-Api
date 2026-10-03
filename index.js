@@ -5,6 +5,7 @@ const os = require('os');
 const App = require('./src/app');
 const cron = require('node-cron');
 const ServicioBackup = require('./src/Servicios/System_Backup_Servicio');
+const { IniciarAlertasWhatsApp } = require('./src/Servicios/AlertasWhatsAppServicio');
 const ServicioDrive = require('./src/Servicios/GoogleDrive_Servicio');
 const { Correo_Informe_respaldo } = require('./src/Servicios/Correo_Informe_Respaldo_Servicio');
 const { DateTime } = require('luxon');
@@ -90,6 +91,7 @@ for (const iface of Object.values(networkInterfaces).flat()) {
   if (iface.family === 'IPv4' && !iface.internal) ipLocal = iface.address;
 }
 
+IniciarAlertasWhatsApp();
 App.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor corriendo en: http://localhost:${PORT}/api`);
   console.log(`🚀 Servidor corriendo en: http://${ipLocal}:${PORT}/api`);
