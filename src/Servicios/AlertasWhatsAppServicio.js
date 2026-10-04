@@ -41,7 +41,7 @@ const EnviarTextoLibre = async (mensaje, numero) => {
                 }
             }
         );
-       // console.log(`✅ ENVIADO → ID: ${respuesta.data?.messages?.[0]?.id}`);
+        // console.log(`✅ ENVIADO → ID: ${respuesta.data?.messages?.[0]?.id}`);
         console.log(`✅ ENVIADO`);
         return { enviado: true };
     } catch (err) {
@@ -86,7 +86,8 @@ const Revisar = async () => {
 
         const alertas = [];
         for (const p of pedidos) {
-            if ((p.CaEstadoPedido?.NombreEstadoPedido || '').toUpperCase() === 'ENTREGADO') continue;
+            const nombreEstado = (p.CaEstadoPedido?.NombreEstadoPedido || '').toUpperCase();
+            if (nombreEstado !== 'CONFIRMADO') continue;
             const estado = CalcularEstado(p.FechaEntrega, hoy);
             if (estado.dias <= 5) {
                 alertas.push({
@@ -134,7 +135,7 @@ const Revisar = async () => {
             }
             // console.log(`✅ [${fechaHoy}] — ${alertas.length} pedidos procesados`);
         } else {
-            console.log(`✅ [${fechaHoy}] — Sin pedidos próximos a vencer`);
+            console.log(`✅ [${fechaHoy}] — Sin pedidos CONFIRMADOS próximos a vencer`);
         }
     } catch (err) {
         console.error('❌ Error general:', err.message);
