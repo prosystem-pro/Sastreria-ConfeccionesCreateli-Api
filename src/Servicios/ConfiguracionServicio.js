@@ -83,7 +83,7 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
             Precio,
             Stock,
             Estatus,
-            NombreProducto
+            // NombreProducto
         } = Datos;
 
         if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
@@ -143,9 +143,9 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
             StockActual: Stock,
             Estatus,
 
-            ...(NombreProducto && {
-                NombreProducto: NormalizarNombre(NombreProducto)
-            })
+            // ...(NombreProducto && {
+            //     NombreProducto: NormalizarNombre(NombreProducto)
+            // })
         }, { transaction: Transaccion });
 
         // =========================
@@ -1062,6 +1062,61 @@ const EliminarTela = async (codigo) => {
         throw error;
     }
 };
+
+
+const CambiarNombreProducto = async (CodigoProducto, NombreNuevo, CodigoUsuario) => {
+    const Transaccion = await BaseDatos.transaction();
+    try {
+
+        if (!CodigoProducto)
+            LanzarError('Código de producto es requerido', 400);
+        if (!NombreNuevo || !NombreNuevo.trim())
+            LanzarError('Nuevo nombre del producto es requerido', 400);
+        if (!CodigoUsuario)
+            LanzarError('Usuario es requerido', 400);
+
+        const CodigoEmpresa = 1;
+        const NombreNormalizado = NormalizarNombre(NombreNuevo.trim());
+
+        const ProductoDB = await ProductoRelacion.findOne({
+            where: {
+                CodigoProducto,
+                CodigoEmpresa
+            },
+            transaction: Transaccion
+        });
+        if (!ProductoDB)
+            LanzarError('Producto no encontrado', 404);
+
+        const ProductoDuplicado = await ProductoRelacion.findOne({
+            where: {
+                NombreProducto: NombreNormalizado,
+                CodigoEmpresa,
+                CodigoProducto: { [Op.ne]: CodigoProducto } 
+            },
+            transaction: Transaccion
+        });
+        if (ProductoDuplicado)
+            LanzarError('Ya existe otro producto con ese nombre', 400);
+
+        await ProductoDB.update({
+            NombreProducto: NombreNormalizado
+          
+        }, { transaction: Transaccion });
+
+        await Transaccion.commit();
+        return {
+            CodigoProducto,
+            NombreAnterior: ProductoDB.NombreProducto,
+            NombreNuevo: NombreNormalizado,
+            Mensaje: 'Nombre actualizado correctamente'
+        };
+    } catch (error) {
+        await Transaccion.rollback();
+        throw error;
+    }
+};
+
 module.exports = {
     EliminarTipoTela, EliminarTela,
     CrearProductoInventario,
@@ -1076,6 +1131,6 @@ module.exports = {
     ObtenerTipoTelaPorCodigo,
     CrearTela, ListadoNombreTelaCompleto,
     EditarTela, ListadoProducto,
-    ObtenerTelaPorCodigo, CrearVariacionInventario
-
+    ObtenerTelaPorCodigo, CrearVariacionInventario,
+    CambiarNombreProducto
 };

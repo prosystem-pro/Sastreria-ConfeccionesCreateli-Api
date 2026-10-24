@@ -518,13 +518,56 @@ const EliminarTela = async (req, res) => {
 
 };
 
+const CambiarNombreProducto = async (req, res) => {
+    try {
+        const { CodigoProducto } = req.params;
+        const { NombreNuevo } = req.body;
+        const CodigoUsuario = req.Datos.CodigoUsuario;
+
+        if (!CodigoProducto) {
+            return ManejarError(
+                { message: 'Código de producto es requerido' },
+                res
+            );
+        }
+        if (!NombreNuevo || !NombreNuevo.trim()) {
+            return ManejarError(
+                { message: 'El nuevo nombre es requerido' },
+                res
+            );
+        }
+
+        const resultado = await Servicio.CambiarNombreProducto(
+            Number(CodigoProducto),
+            NombreNuevo,
+            CodigoUsuario
+        );
+
+        return ResponderExito(
+            res,
+            'Nombre del producto cambiado correctamente.',
+            resultado,
+            200
+        );
+    } catch (error) {
+        return ManejarError(
+            error,
+            res,
+            'Error al cambiar el nombre del producto'
+        );
+    }
+};
+
 module.exports = {
-    CrearProductoInventario, ObtenerInventarioListado, ObtenerInventarioPorCodigo, RestaurarInventario,
-    EliminarInventario, ObtenerInventarioEliminados, ActualizarProductoInventario, ListadoTela, ListadoTipoTela,
+    CrearProductoInventario, ObtenerInventarioListado, 
+    ObtenerInventarioPorCodigo, RestaurarInventario,
+    EliminarInventario, ObtenerInventarioEliminados, 
+    ActualizarProductoInventario, ListadoTela, ListadoTipoTela,
     CrearTipoTela,
     CrearTela,
     ObtenerTipoTelaPorCodigo,
     ObtenerTelaPorCodigo,
     EditarTipoTela, ListadoTelaCompleto,
-    EditarTela, EliminarTipoTela, EliminarTela, CrearVariacionInventario, ListadoProducto
+    EditarTela, EliminarTipoTela, EliminarTela, CrearVariacionInventario, 
+    ListadoProducto, CambiarNombreProducto
 };

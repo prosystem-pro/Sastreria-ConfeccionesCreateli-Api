@@ -7,8 +7,8 @@ const Tabla = 'Configuracion';
 const { CrearProductoInventario, ObtenerInventarioListado, ObtenerInventarioEliminados,
     EliminarInventario, RestaurarInventario, ActualizarProductoInventario,
     ObtenerInventarioPorCodigo, ListadoTipoTela, ListadoTela, CrearTipoTela, EditarTipoTela,
-    ObtenerTipoTelaPorCodigo, CrearTela, EditarTela, ObtenerTelaPorCodigo, EliminarTipoTela, EliminarTela,ListadoProducto,
-    CrearVariacionInventario, ListadoTelaCompleto } = require('../Controladores/ConfiguracionControlador');
+    ObtenerTipoTelaPorCodigo, CrearTela, EditarTela, ObtenerTelaPorCodigo, EliminarTipoTela, EliminarTela, ListadoProducto,
+    CrearVariacionInventario, ListadoTelaCompleto, CambiarNombreProducto } = require('../Controladores/ConfiguracionControlador');
 
 const VerificarToken = require('../FuncionIntermedia/VerificarToken');
 const VerificarPermisos = require('../FuncionIntermedia/VerificarPermisos');
@@ -84,6 +84,8 @@ Router.delete(`/${Modelo}/eliminar-tela/:codigo`, VerificarToken, VerificarPermi
 
 // Variaciones
 Router.post(`/${Modelo}/crear-variacion`, VerificarToken, VerificarPermisos('CrearVariacionInventario', Tabla), CrearVariacionInventario);
+Router.put(`/${Modelo}/cambiar-nombre-producto/:CodigoProducto`, VerificarToken, VerificarPermisos('EditarProducto', Tabla), CambiarNombreProducto);
+
 
 // Listados adicionales
 Router.get(`/${Modelo}/listado-producto`, VerificarToken, VerificarPermisos('VerProducto', Tabla), ListadoProducto);
